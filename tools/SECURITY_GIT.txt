@@ -1,0 +1,25 @@
+上 Git 前安全檢查（請逐項確認）
+================================
+
+已處理
+------
+- .gitignore：whitelist_inserts.sql、*.local.sql、school-auth-config.secret.js 等
+- MZ_AIFairyCompanion 的 OpenRouter apiKey 已清空；若曾外洩請到 OpenRouter 撤銷舊金鑰
+- 登入設定拆成 defaults + secret（範本可提交，真值放 secret 不提交）
+
+仍會出現在版本庫（公開儲存庫＝任何人可看）
+------------------------------------------
+- js/plugins.js 內 OmniscientEncyclopedia 的 Supabase URL 與 anon/publishable 金鑰
+  （設計上給前端用，須靠 RLS；若曾誤提交 service_role 請立即旋轉）
+- Kurimanju_TimeLimit 的 UnlockPassword（遊戲內解鎖用，非 Supabase）
+
+克隆或新電腦後必做
+------------------
+1) cp js/school-auth-config.secret.EXAMPLE.js js/school-auth-config.secret.js
+   填入與 plugins.js 一致的 Supabase 與教師電郵清單
+2) 管理員名冊：複製 tools/supabase_seed_admin_whitelist.sql 為 .local.sql 填入真實 INSERT，只在 Supabase SQL Editor 執行 .local 檔
+
+GitHub Pages 公開網址
+--------------------
+若儲存庫為「公開」，secret.js 不會被推上 Git，網頁登入會缺設定。
+選項：私人儲存庫、或 CI 在建置時寫入 secret.js、或接受將「僅 anon 金鑰」寫入可追蹤檔（風險自負）。

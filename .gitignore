@@ -1,0 +1,24 @@
+# 本機／機密（切勿提交）
+.env
+.env.*
+*.local.sql
+whitelist_inserts.sql
+js/school-auth-config.secret.js
+tools/supabase_seed_admin_whitelist.local.sql
+
+# 系統與編輯器
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# 依賴
+node_modules/
+
+# 玩家存檔（勿提交）
+save/*.rmmzsave
+
+# 備份
+*.bak

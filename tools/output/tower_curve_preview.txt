@@ -1,0 +1,7 @@
+=== Plugin multiplier preview (sample named enemy) ===
+enemyId=11 name=小精靈
+  floor 1: MHP~7488 ATK~396 (multHp=1.20 multStat=1.10)
+  floor 25: MHP~56804 ATK~1417 (multHp=9.10 multStat=3.94)
+  floor 50: MHP~118449 ATK~2548 (multHp=18.98 multStat=7.08)
+  floor 75: MHP~185108 ATK~3710 (multHp=29.66 multStat=10.31)
+  floor 100: MHP~255248 ATK~4892 (multHp=40.91 multStat=13.59)
