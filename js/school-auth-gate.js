@@ -303,8 +303,8 @@
         d.innerHTML =
             '<div style="max-width:420px;line-height:1.5">' +
             '<h2 style="margin-top:0">缺少學校登入設定</h2>' +
-            '<p>請複製 <code>js/school-auth-config.secret.EXAMPLE.js</code> 為 <code>js/school-auth-config.secret.js</code>，填入 Supabase 網址與金鑰（須與 plugins.js 內全知圖鑑一致）。</p>' +
-            '<p style="opacity:0.85;font-size:0.9rem">此 secret 檔已列入 .gitignore，不會進入 Git；公開部署時請用私人儲存庫或 CI 注入。</p>' +
+            '<p>請編輯 <code>js/school-auth-config.defaults.js</code>，填入 Supabase 網址與金鑰（須與 plugins.js 內全知圖鑑一致）。</p>' +
+            '<p style="opacity:0.85;font-size:0.9rem">公開儲存庫時此檔會被看見；勿放 service_role。</p>' +
             '</div>';
         document.body.appendChild(d);
     }
