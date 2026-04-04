@@ -1,5 +1,5 @@
 //=============================================================================
-// main.js v1.10.0
+// main.js v1.10.0 (+ 修正：登入後動態載入時 load 已觸發導致卡轉圈)
 //=============================================================================
 
 const scriptUrls = [
@@ -23,6 +23,9 @@ class Main {
         this.xhrSucceeded = false;
         this.loadCount = 0;
         this.error = null;
+        this._gameStarted = false;
+        this._pluginsReady = false;
+        this._startScheduled = false;
     }
 
     run() {
@@ -30,6 +33,7 @@ class Main {
         this.testXhr();
         this.hookNwjsClose();
         this.loadMainScripts();
+        window.addEventListener("error", this.onWindowError.bind(this));
     }
 
     showLoadingSpinner() {
@@ -49,15 +53,28 @@ class Main {
     }
 
     testXhr() {
+        const cur = document.currentScript;
+        const src = cur && cur.src;
+        if (!src) {
+            // 動態插入 main.js（例如 school-auth-gate 登入後）時 currentScript 常為 null
+            this.xhrSucceeded = true;
+            this.tryStartGame();
+            return;
+        }
         const xhr = new XMLHttpRequest();
-        xhr.open("GET", document.currentScript.src);
-        xhr.onload = () => (this.xhrSucceeded = true);
+        xhr.open("GET", src);
+        xhr.onload = () => {
+            this.xhrSucceeded = true;
+            this.tryStartGame();
+        };
+        xhr.onerror = () => {
+            this.xhrSucceeded = true;
+            this.tryStartGame();
+        };
         xhr.send();
     }
 
     hookNwjsClose() {
-        // [Note] When closing the window, the NW.js process sometimes does
-        //   not terminate properly. This code is a workaround for that.
         if (typeof nw === "object") {
             nw.Window.get().on("close", () => nw.App.quit());
         }
@@ -76,18 +93,51 @@ class Main {
             document.body.appendChild(script);
         }
         this.numScripts = scriptUrls.length;
-        window.addEventListener("load", this.onWindowLoad.bind(this));
-        window.addEventListener("error", this.onWindowError.bind(this));
     }
 
     onScriptLoad() {
         if (++this.loadCount === this.numScripts) {
             PluginManager.setup($plugins);
+            this._pluginsReady = true;
+            this.tryStartGame();
         }
     }
 
     onScriptError(e) {
         this.printError("Failed to load", e.target._url);
+    }
+
+    tryStartGame() {
+        if (this._gameStarted) return;
+        if (!this._pluginsReady || !this.xhrSucceeded) return;
+        if (this._startScheduled) return;
+        this._startScheduled = true;
+
+        const start = () => {
+            if (this._gameStarted) return;
+            this._gameStarted = true;
+
+            if (!this.xhrSucceeded) {
+                this.printError("Error", "Your browser does not allow to read local files.");
+                return;
+            }
+            if (this.isPathRandomized()) {
+                this.printError("Error", "Please move the Game.app to a different folder.");
+                return;
+            }
+            if (this.error) {
+                this.printError(this.error.name, this.error.message);
+                return;
+            }
+            this.initEffekseerRuntime();
+        };
+
+        // 登入後才載入 main.js 時，window「load」往往已經觸發過，不能再只聽 load
+        if (document.readyState === "complete") {
+            setTimeout(start, 0);
+        } else {
+            window.addEventListener("load", start, { once: true });
+        }
     }
 
     printError(name, message) {
@@ -110,20 +160,6 @@ class Main {
         return nameDiv.outerHTML + messageDiv.outerHTML;
     }
 
-    onWindowLoad() {
-        if (!this.xhrSucceeded) {
-            const message = "Your browser does not allow to read local files.";
-            this.printError("Error", message);
-        } else if (this.isPathRandomized()) {
-            const message = "Please move the Game.app to a different folder.";
-            this.printError("Error", message);
-        } else if (this.error) {
-            this.printError(this.error.name, this.error.message);
-        } else {
-            this.initEffekseerRuntime();
-        }
-    }
-
     onWindowError(event) {
         if (!this.error) {
             this.error = event.error;
@@ -131,8 +167,6 @@ class Main {
     }
 
     isPathRandomized() {
-        // [Note] We cannot save the game properly when Gatekeeper Path
-        //   Randomization is in effect.
         return (
             typeof process === "object" &&
             process.mainModule.filename.startsWith("/private/var")
