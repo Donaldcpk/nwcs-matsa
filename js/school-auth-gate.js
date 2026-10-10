@@ -1,6 +1,8 @@
 /**
- * 網頁版進入遊戲前：學校電郵 + 密碼（出生年月日八碼）／管理員帳號 admin
- * 成功後載入 js/main.js。設定見 school-auth-config.js
+ * 網頁版進入遊戲前要先登入，成功後才載入 js/main.js。
+ * 學生：互聯網登入（s 加 7 位數字），密碼是出生日期 8 位（年份在前）。
+ * 老師：學校電郵或 nwcs 編號，密碼是校方已發的密碼。
+ * 設定見 school-auth-config.defaults.js。
  */
 (function () {
     'use strict';
@@ -12,10 +14,20 @@
         return PREFIX + suffix;
     }
 
+    function schoolDomain() {
+        return String(CFG.studentEmailDomain || 'ngwahsec.edu.hk').replace(/^@/, '').toLowerCase();
+    }
+
     function normalizeEmail(raw) {
         var s = String(raw || '').trim().toLowerCase();
+        var domain = schoolDomain();
         if (s === 'admin') {
-            return String(CFG.adminAuthEmail || 'admin@ngwahsec.edu.hk').toLowerCase();
+            return String(CFG.adminAuthEmail || 'admin@' + domain).toLowerCase();
+        }
+        // 學生只打 s+7 位、老師只打 nwcs 編號時，自動補上學校電郵。
+        var localStaff = /^[a-z][a-z0-9._+-]*$/.test(s) && /^(nwcs|nwcsw|nwcsssw|nwcsies|nwcsptc)/.test(s);
+        if (/^s\d{7}$/.test(s) || /^nwcs\d+$/.test(s) || (s.indexOf('@') < 0 && localStaff)) {
+            return s + '@' + domain;
         }
         return s;
     }
@@ -123,10 +135,36 @@
             return {};
         });
         if (!res.ok) {
+            if (res.status === 429) {
+                throw new Error('429');
+            }
             var msg = data.msg || data.error_description || data.message || '登入失敗';
             throw new Error(msg);
         }
         return data;
+    }
+
+    function sleep(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    async function signInWithRetry(email, password) {
+        var lastError = null;
+        for (var attempt = 0; attempt < 4; attempt++) {
+            try {
+                return await signInWithPassword(email, password);
+            } catch (e) {
+                var msg = String(e && e.message ? e.message : e);
+                if (msg !== '429' && msg.toLowerCase().indexOf('too many') < 0) {
+                    throw e;
+                }
+                lastError = e;
+                await sleep(2000 * (attempt + 1));
+            }
+        }
+        throw new Error('同一時間登入的人太多，請等約半分鐘再按一次。帳號本身沒有問題。');
     }
 
     async function signUp(email, password) {
@@ -216,12 +254,12 @@
         gate.setAttribute('role', 'dialog');
         gate.innerHTML =
             '<div class="school-login-card">' +
-            '<h1 class="school-login-title">TSA Training</h1>' +
-            '<p class="school-login-hint">請使用<strong>學校電郵</strong>登入（與校方派發相同）。密碼為<strong>出生年月日</strong>共 8 碼，例如 20100315。</p>' +
-            '<p class="school-login-hint admin">管理員請在電郵欄輸入 <code>admin</code>，密碼為管理密碼。</p>' +
-            '<label class="school-login-label">電郵</label>' +
-            '<input type="email" id="schoolLoginEmail" class="school-login-input" autocomplete="username" />' +
-            '<label class="school-login-label">密碼（8 碼生日）</label>' +
+            '<h1 class="school-login-title">伍華數學練習</h1>' +
+            '<p class="school-login-hint">學生：登入名稱是互聯網登入（<strong>s</strong> 後面 7 個數字）。密碼是出生日期 <strong>8 位</strong>，年份在前。</p>' +
+            '<p class="school-login-hint">老師：登入名稱是學校電郵或 nwcs 編號。密碼是校方已發的密碼。管理帳號可輸入 admin。</p>' +
+            '<label class="school-login-label">登入名稱</label>' +
+            '<input type="text" id="schoolLoginEmail" class="school-login-input" autocomplete="username" autocapitalize="none" spellcheck="false" />' +
+            '<label class="school-login-label">密碼</label>' +
             '<input type="password" id="schoolLoginPassword" class="school-login-input" autocomplete="current-password" />' +
             '<p id="schoolLoginError" class="school-login-error" style="display:none"></p>' +
             '<button type="button" id="schoolLoginBtn" class="school-login-btn">登入並進入遊戲</button>' +
@@ -245,9 +283,10 @@
             try {
                 var data;
                 try {
-                    data = await signInWithPassword(email, password);
+                    data = await signInWithRetry(email, password);
                 } catch (e1) {
                     var msg1 = String(e1.message || e1 || '').toLowerCase();
+                    if (msg1.indexOf('太多') >= 0 || msg1 === '429') throw e1;
                     var tryRegister =
                         msg1.indexOf('invalid') >= 0 ||
                         msg1.indexOf('credential') >= 0 ||
@@ -260,17 +299,17 @@
                         } else if (up.access_token) {
                             data = up;
                         } else {
-                            data = await signInWithPassword(email, password);
+                            data = await signInWithRetry(email, password);
                         }
                     } catch (e2) {
                         var msg2 = String(e2.message || e2 || '').toLowerCase();
                         if (msg2.indexOf('already') >= 0 || msg2.indexOf('registered') >= 0) {
-                            throw new Error('此電郵已註冊，請檢查密碼（應為出生年月日八碼）。');
+                            throw new Error('這個登入名稱已有帳號。學生請核對出生日期 8 位；老師請用校方已發的密碼。');
                         }
                         throw new Error(
                             '無法建立帳號：' +
                                 (e2.message || e2) +
-                                '。請確認電郵已列入校方名冊，或請老師於 Supabase 檢查設定。'
+                                '。請確認登入名稱已列入本學年名冊。'
                         );
                     }
                 }
