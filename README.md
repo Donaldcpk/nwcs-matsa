@@ -1,13 +1,13 @@
-# TSA Training（數學選擇題練習）
+# 伍華數學練習
 
-給中一至中三學生在瀏覽器裡練習數學選擇題。答對的選項以試算表答案表為準。
+給伍華中學學生在瀏覽器裡練習數學選擇題。答對的選項以試算表答案表為準。畫面上不會把練習叫做 TSA 操練。
 
 ## 特色功能
 
 - 中一、中二、中三的中文與英文選擇題。
 - 正確答案記在題庫的 `C_A`（A、B、C 或 D）。
-- 另有 TSA 練習題，答案不在這次的 S1–S6 答案表裡。
-- 學校登入與排行榜（需自行設定，見 `tools/`）。
+- 另有綜合練習題，答案不在這次的 S1–S6 答案表裡。題目圖片仍放在原有資料夾，避免路徑失效。
+- 學生用互聯網登入（s 加 7 位數字）和出生日期 8 位進入；老師用學校電郵或 nwcs 編號，以及校方已發的密碼。
 
 ## 安裝與執行
 
@@ -23,6 +23,8 @@ python3 -m http.server 8080
 
 ## 使用說明
 
+- 學生登入名稱填互聯網登入（s 後面 7 個數字），密碼填出生日期 8 位，年份在前。
+- 老師登入名稱填學校電郵或 nwcs 編號，密碼填校方已發的密碼。老師密碼不會改成出生日期。
 - 進入遊戲後選年級與中文或英文，依畫面作答。
 - 題目圖片在 `img` 對應資料夾；題號來自檔名，例如 `JSMATH1A01MCQ2.png` 是中一 1A01 第 2 題。
 - 正確答案欄位：
@@ -33,7 +35,8 @@ python3 -m http.server 8080
 ## 架構總覽
 
 - `index.html`：遊戲入口。
-- `js/plugins/questionDatabase.js`：題庫（S1／S2／S3 中英文，以及 TSA）。
+- `js/plugins/questionDatabase.js`：題庫（S1／S2／S3 中英文，以及綜合練習）。
+- `js/school-auth-gate.js`：進入遊戲前的登入畫面。
 - `js/plugins/MZQuizzer.js`：顯示題目、核對 `C_A`。
 - `data/`：RPG Maker MZ 地圖與系統資料。
 
@@ -49,7 +52,7 @@ node --check js/plugins/questionDatabase.js
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前公開修正為 `0.1.1`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.2.0`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 
