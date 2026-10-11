@@ -1,8 +1,12 @@
 # 本機／機密（切勿提交）
 .env
 .env.*
+!tools/.env.supabase.local.example
+tools/.env.supabase.local
 *.local.sql
 whitelist_inserts.sql
+tools/student_auth_passwords.csv
+tools/student_whitelist_rows.csv
 js/school-auth-config.secret.js
 tools/supabase_seed_admin_whitelist.local.sql
 

@@ -25,6 +25,7 @@ python3 -m http.server 8080
 
 - 學生登入名稱填互聯網登入（s 後面 7 個數字），密碼填出生日期 8 位，年份在前。
 - 老師登入名稱填學校電郵或 nwcs 編號，密碼填校方已發的密碼。老師密碼不會改成出生日期。
+- 備用帳號只填 `mathai01` 到 `mathai40`（不用打 @）。密碼用老師派發的備用密碼，不寫在這個網頁或程式庫裡。
 - 進入遊戲後選年級與中文或英文，依畫面作答。
 - 題目圖片在 `img` 對應資料夾；題號來自檔名，例如 `JSMATH1A01MCQ2.png` 是中一 1A01 第 2 題。
 - 正確答案欄位：
@@ -46,13 +47,24 @@ python3 -m http.server 8080
 
 ```bash
 node --check js/plugins/questionDatabase.js
+node --check js/school-auth-gate.js
+node tools/test_school_login_normalize.mjs
+```
+
+備用帳建帳（只在自己的電腦，金鑰與密碼不要提交）：
+
+```bash
+cp tools/.env.supabase.local.example tools/.env.supabase.local
+# 編輯 .env.supabase.local：填 service_role，以及校方文件裡的備用密碼
+node tools/sync_student_whitelist_from_csv.mjs --backup-mathai
+node tools/provision_supabase_auth_users.mjs --backup-mathai
 ```
 
 再對照答案表：每一題的 `C_A` 應等於該章、該語言、該題號的儲存格。答案表空白或寫 `N` 的題目會保持 `?`，不會猜答案。
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.2.0`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.0`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 

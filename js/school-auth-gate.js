@@ -2,6 +2,7 @@
  * 網頁版進入遊戲前要先登入，成功後才載入 js/main.js。
  * 學生：互聯網登入（s 加 7 位數字），密碼是出生日期 8 位（年份在前）。
  * 老師：學校電郵或 nwcs 編號，密碼是校方已發的密碼。
+ * 備用帳：只輸入 mathai01–mathai40（不用打 @），密碼是老師派發的備用密碼。
  * 設定見 school-auth-config.defaults.js。
  */
 (function () {
@@ -18,15 +19,22 @@
         return String(CFG.studentEmailDomain || 'ngwahsec.edu.hk').replace(/^@/, '').toLowerCase();
     }
 
+    function isBackupMathai(local) {
+        var m = /^mathai(\d{2})$/.exec(local);
+        if (!m) return false;
+        var n = parseInt(m[1], 10);
+        return n >= 1 && n <= 40;
+    }
+
     function normalizeEmail(raw) {
         var s = String(raw || '').trim().toLowerCase();
         var domain = schoolDomain();
         if (s === 'admin') {
             return String(CFG.adminAuthEmail || 'admin@' + domain).toLowerCase();
         }
-        // 學生只打 s+7 位、老師只打 nwcs 編號時，自動補上學校電郵。
+        // 學生只打 s+7 位、老師只打 nwcs 編號、備用帳只打 mathai01–mathai40 時，自動補上學校電郵。
         var localStaff = /^[a-z][a-z0-9._+-]*$/.test(s) && /^(nwcs|nwcsw|nwcsssw|nwcsies|nwcsptc)/.test(s);
-        if (/^s\d{7}$/.test(s) || /^nwcs\d+$/.test(s) || (s.indexOf('@') < 0 && localStaff)) {
+        if (/^s\d{7}$/.test(s) || /^nwcs\d+$/.test(s) || isBackupMathai(s) || (s.indexOf('@') < 0 && localStaff)) {
             return s + '@' + domain;
         }
         return s;
@@ -257,6 +265,7 @@
             '<h1 class="school-login-title">伍華數學練習</h1>' +
             '<p class="school-login-hint">學生：登入名稱是互聯網登入（<strong>s</strong> 後面 7 個數字）。密碼是出生日期 <strong>8 位</strong>，年份在前。</p>' +
             '<p class="school-login-hint">老師：登入名稱是學校電郵或 nwcs 編號。密碼是校方已發的密碼。管理帳號可輸入 admin。</p>' +
+            '<p class="school-login-hint">備用帳號：只輸入 <strong>mathai01</strong> 到 <strong>mathai40</strong>（不用打 @）。密碼用老師派發的備用密碼。</p>' +
             '<label class="school-login-label">登入名稱</label>' +
             '<input type="text" id="schoolLoginEmail" class="school-login-input" autocomplete="username" autocapitalize="none" spellcheck="false" />' +
             '<label class="school-login-label">密碼</label>' +
@@ -367,6 +376,8 @@
         }
         buildGate();
     }
+
+    window.NWCS_normalizeSchoolLogin = normalizeEmail;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', start);

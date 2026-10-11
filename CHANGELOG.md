@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-11
+
+### Added
+
+- 備用帳號 mathai01–mathai40 可只輸入編號（不用打 @），登入畫面會自動補上學校電郵。
+- 本機建帳腳本：`tools/sync_student_whitelist_from_csv.mjs --backup-mathai` 與 `tools/provision_supabase_auth_users.mjs --backup-mathai`。只用於 RMMZ-MATH。
+
+### Security
+
+- 備用密碼、service_role、名冊與密碼 CSV 不會提交到 Git。
+
 ## [0.2.0] - 2026-10-10
 
 ### Added
