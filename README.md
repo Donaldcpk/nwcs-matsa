@@ -27,6 +27,7 @@ python3 -m http.server 8080
 - 老師登入名稱填學校電郵或 nwcs 編號，密碼填校方已發的密碼。老師密碼不會改成出生日期。
 - 備用帳號只填 `mathai01` 到 `mathai40`（不用打 @）。少打一個 0 也可以，例如 `mathai1` 會當成 `mathai01`。密碼用老師派發的備用密碼，不寫在這個網頁或程式庫裡。密碼打錯不會開新帳。
 - 進入遊戲後選年級與中文或英文，依畫面作答。
+- 一進大廳，畫面會用大字和箭頭告訴你下一步：先拿寶箱，再走右邊的門，然後打中間的機械人。打贏會自己去下一層，一直打到第 100 層。
 - 開新遊戲時，悠真、莉娜、米勒、塞拉都是 4 級。
 - 登入畫面說明最後有例子：登入名稱 `s1234567`，密碼 `20261012`。
 - 世界排名由 2026-10-12 16:00（香港時間）起重新計算，之前的分數不顯示。
@@ -54,7 +55,9 @@ python3 -m http.server 8080
 node --check js/plugins/questionDatabase.js
 node --check js/plugins/quizPictureFit.js
 node --check js/plugins/MZQuizzer.js
+node --check js/plugins/KidTowerGuide.js
 node --check js/school-auth-gate.js
+node tools/test_kid_tower_guide.mjs
 node tools/test_quiz_picture_fit.mjs
 node tools/test_school_login_normalize.mjs
 ```
@@ -72,7 +75,7 @@ node tools/provision_supabase_auth_users.mjs --backup-mathai
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.5`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.6`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 
