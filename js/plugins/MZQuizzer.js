@@ -3,7 +3,7 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc [v1.4.6] Quiz Engine（TSA 答錯同一題；題庫 T 欄可倒數逾時算錯）
+ * @plugindesc [v1.4.7] Quiz Engine（題圖縮到畫面內；答題按鈕整列顯示）
  * @author Starbird (Modified by Senior Programmer)
  * @help MZ-Quiz-Engine.js
  *
@@ -36,6 +36,10 @@
  * @default 988
  *
  * @help 
+ * [v1.4.7] 題目圖片若比畫面大，會縮小並置中，避免右邊或下邊的字被切掉。
+ *         答題時 A／B／C／D 改成畫面下方一整列，四個選項都會在畫面裡。
+ *         瀏覽器視窗比遊戲小時，整頁會縮小以完整顯示，不再裁掉右下角。
+ *
  * [v1.4.6] TSA（Var 990=4）：以變數鎖定題號，答錯再出題時仍為同一題，與塔模式一致。
  *         題庫「T」>0 時視為倒數幀數（60幀=1秒，如 900=15秒），逾時視同答錯；勿再併用事件「計時器」（到期會中止戰鬥）。
  *         軍團事件：在適當頁（如回合 0、戰鬥開始）只放插件指令「MZQuizzer → getQuestion」即可，倒數由題庫 T 控制。
@@ -72,9 +76,48 @@
     if (quizMessageLineCount < 1) quizMessageLineCount = 1;
     if (quizMessageLineCount > 4) quizMessageLineCount = 4;
     const tsaLockVariableId = Number(parameters['TsaLockVariableId'] || 988);
+    const QUIZ_PICTURE_ID = 98;
 
     let _mzqExpireFrame = 0;
     let _mzqPending = null;
+
+    Graphics._defaultStretchMode = function() {
+        return true;
+    };
+
+    function quizPictureOnScreen() {
+        if (typeof $gameScreen === "undefined" || !$gameScreen) return false;
+        const pic = $gameScreen.picture(QUIZ_PICTURE_ID);
+        return !!(pic && pic.name());
+    }
+
+    function applyQuizPictureFit(bitmap, choices) {
+        const pic = $gameScreen.picture(QUIZ_PICTURE_ID);
+        if (!pic || !bitmap || !bitmap.width || !bitmap.height) return;
+        if (typeof QuizPictureFit === "undefined") return;
+        const horizontal = QuizPictureFit.choicesAreShort(choices);
+        const reserve = QuizPictureFit.bottomReserve(
+            choices && choices.length ? choices.length : 4,
+            horizontal
+        );
+        const layout = QuizPictureFit.layout(
+            bitmap.width,
+            bitmap.height,
+            Graphics.boxWidth,
+            Graphics.boxHeight,
+            reserve
+        );
+        pic._origin = 0;
+        pic._x = layout.x;
+        pic._y = layout.y;
+        pic._scaleX = layout.scalePercent;
+        pic._scaleY = layout.scalePercent;
+        pic._targetX = layout.x;
+        pic._targetY = layout.y;
+        pic._targetScaleX = layout.scalePercent;
+        pic._targetScaleY = layout.scalePercent;
+        pic._duration = 0;
+    }
 
     const _Window_Message_startMessage = Window_Message.prototype.startMessage;
     Window_Message.prototype.startMessage = function () {
@@ -87,8 +130,9 @@
             scene instanceof Scene_Battle;
         if (isBattleMsg && scene.calcWindowHeight) {
             const narrow =
-                quizPromptSubstring.length > 0 && text.indexOf(quizPromptSubstring) >= 0;
-            const lines = narrow ? quizMessageLineCount : 4;
+                quizPictureOnScreen() ||
+                (quizPromptSubstring.length > 0 && text.indexOf(quizPromptSubstring) >= 0);
+            const lines = quizPictureOnScreen() ? 1 : (narrow ? quizMessageLineCount : 4);
             const ww = Graphics.boxWidth;
             const wh = scene.calcWindowHeight(lines, false) + 8;
             this.move(0, this.y, ww, wh);
@@ -198,16 +242,19 @@
             picName = question.GUID;
         }
 
+        var quizBitmap = null;
         if (picName !== "") {
             picName = picName.replace(/\.(png|jpg|jpeg)$/i, "");
             var finalPath = folderPrefix + picName;
-            $gameScreen.showPicture(98, finalPath, 0, 0, 0, 100, 100, 255, 0);
+            $gameScreen.showPicture(QUIZ_PICTURE_ID, finalPath, 0, 0, 0, 100, 100, 255, 0);
+            quizBitmap = ImageManager.loadPicture(finalPath);
         }
 
         // --- 4. 處理文字與選項 ---
         var qText = question.Q;
         if (question.E === 1) qText = atob(rotHex(qText));
         qText = qText.replace(/(?:\r\n|\r|\n)/g, '\\n');
+        if (qText === "MCQ") qText = "請選答案";
         $gameMessage.add(qText);
 
         var choices = [];
@@ -268,6 +315,13 @@
             } else {
                 _mzqExpireFrame = 0;
                 _mzqPending = null;
+            }
+
+            if (quizBitmap) {
+                var fitChoices = choices.slice();
+                quizBitmap.addLoadListener(function() {
+                    applyQuizPictureFit(quizBitmap, fitChoices);
+                });
             }
 
             $gameMessage.setChoices(choices, 0, -1);
@@ -369,6 +423,50 @@
     }
 
     function rotHex(s) { return s; }
+
+    var MZQ_WindowChoiceList_maxCols = Window_ChoiceList.prototype.maxCols;
+    Window_ChoiceList.prototype.maxCols = function() {
+        if (!quizPictureOnScreen() || typeof QuizPictureFit === "undefined") {
+            return MZQ_WindowChoiceList_maxCols.call(this);
+        }
+        const choices = $gameMessage.choices();
+        return QuizPictureFit.choicesAreShort(choices) ? choices.length : 1;
+    };
+
+    var MZQ_WindowChoiceList_numVisibleRows = Window_ChoiceList.prototype.numVisibleRows;
+    Window_ChoiceList.prototype.numVisibleRows = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_numVisibleRows.call(this);
+        const choices = $gameMessage.choices();
+        const cols = Math.max(1, this.maxCols());
+        return Math.max(1, Math.ceil(choices.length / cols));
+    };
+
+    var MZQ_WindowChoiceList_windowWidth = Window_ChoiceList.prototype.windowWidth;
+    Window_ChoiceList.prototype.windowWidth = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowWidth.call(this);
+        const cols = Math.max(1, this.maxCols());
+        const colW = this.maxChoiceWidth();
+        const spacing = this.colSpacing();
+        const inner = (colW + spacing) * cols;
+        return Math.min(inner + this.padding * 2, Graphics.boxWidth);
+    };
+
+    var MZQ_WindowChoiceList_windowX = Window_ChoiceList.prototype.windowX;
+    Window_ChoiceList.prototype.windowX = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowX.call(this);
+        return Math.max(0, Math.floor((Graphics.boxWidth - this.windowWidth()) / 2));
+    };
+
+    var MZQ_WindowChoiceList_windowY = Window_ChoiceList.prototype.windowY;
+    Window_ChoiceList.prototype.windowY = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowY.call(this);
+        const messageY = this._messageWindow ? this._messageWindow.y : Graphics.boxHeight;
+        let y = messageY - this.windowHeight();
+        const maxY = Graphics.boxHeight - this.windowHeight();
+        if (y > maxY) y = maxY;
+        if (y < 0) y = 0;
+        return y;
+    };
 
     var MZQ_WindowChoiceList_callCancelHandler = Window_ChoiceList.prototype.callCancelHandler;
     Window_ChoiceList.prototype.callCancelHandler = function() {

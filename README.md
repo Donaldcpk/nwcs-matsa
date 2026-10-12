@@ -27,6 +27,7 @@ python3 -m http.server 8080
 - 老師登入名稱填學校電郵或 nwcs 編號，密碼填校方已發的密碼。老師密碼不會改成出生日期。
 - 備用帳號只填 `mathai01` 到 `mathai40`（不用打 @）。密碼用老師派發的備用密碼，不寫在這個網頁或程式庫裡。
 - 進入遊戲後選年級與中文或英文，依畫面作答。
+- 題目圖會縮小到畫面裡，字不會被右邊或下邊切掉。答案按鈕在畫面下方排成一列。
 - 題目圖片在 `img` 對應資料夾；題號來自檔名，例如 `JSMATH1A01MCQ2.png` 是中一 1A01 第 2 題。
 - 正確答案欄位：
   - `C_A`：正確選項（A–D）
@@ -47,7 +48,10 @@ python3 -m http.server 8080
 
 ```bash
 node --check js/plugins/questionDatabase.js
+node --check js/plugins/quizPictureFit.js
+node --check js/plugins/MZQuizzer.js
 node --check js/school-auth-gate.js
+node tools/test_quiz_picture_fit.mjs
 node tools/test_school_login_normalize.mjs
 ```
 
@@ -64,7 +68,7 @@ node tools/provision_supabase_auth_users.mjs --backup-mathai
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.0`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.1`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 
