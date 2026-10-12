@@ -5,7 +5,7 @@ import assert from "assert";
 const code = fs.readFileSync(new URL("../js/plugins/KidTowerGuide.js", import.meta.url), "utf8");
 const sandbox = { module: { exports: {} }, exports: {} };
 vm.runInNewContext(code, sandbox);
-const { kidGuideStep, kidGuideDoorAllowed, kidGuideArrowPlacement } = sandbox.module.exports;
+const { kidGuideStep, kidGuideDoorAllowed, kidGuideArrowPlacement, kidGuideShowArrow } = sandbox.module.exports;
 
 const lobby = {
     mapId: 18,
@@ -70,6 +70,35 @@ const above = kidGuideArrowPlacement(640, -200, 1280, 720, 56);
 assert.strictEqual(above.onScreen, false);
 assert.ok(above.y <= 56 + 1);
 assert.ok(Math.abs(above.rotation - Math.PI) < 0.2);
+
+const floor1 = kidGuideStep({ mapId: 65, floor: 1, goldOpen: true, crownOpen: true, px: 0, py: 0 });
+assert.strictEqual(floor1.eventId, 25);
+assert.strictEqual(kidGuideShowArrow({ firstRobotDone: false, eventId: floor1.eventId }), true);
+assert.strictEqual(kidGuideShowArrow({ firstRobotDone: true, eventId: floor1.eventId }), false);
+assert.strictEqual(kidGuideShowArrow({ firstRobotDone: true, eventId: 26 }), false);
+assert.strictEqual(kidGuideShowArrow({ firstRobotDone: false, eventId: 0 }), false);
+assert.ok(floor1.lines.join("").includes("第 1 層"));
+
+const actors = JSON.parse(fs.readFileSync(new URL("../data/Actors.json", import.meta.url), "utf8"));
+for (const id of [81, 82, 83, 85]) {
+    assert.strictEqual(actors.find((actor) => actor && actor.id === id).initialLevel, 19);
+}
+assert.strictEqual(actors.find((actor) => actor && actor.id === 84).initialLevel, 10);
+
+const events = JSON.parse(fs.readFileSync(new URL("../data/CommonEvents.json", import.meta.url), "utf8"));
+const tower = events.find((event) => event && event.id === 99);
+const winAt = tower.list.findIndex((command) => command.code === 601);
+const floorUpAt = tower.list.findIndex((command) => command.code === 122 && command.parameters[0] === 202 && command.parameters[2] === 1);
+const levelUps = tower.list.filter((command) => command.code === 316);
+assert.strictEqual(levelUps.length, 1);
+assert.deepStrictEqual(levelUps[0].parameters, [0, 0, 0, 0, 1, true]);
+assert.ok(winAt < tower.list.indexOf(levelUps[0]) && tower.list.indexOf(levelUps[0]) < floorUpAt);
+const gate = tower.list.find((command) => command.code === 111 && command.parameters[0] === 12);
+assert.ok(gate.parameters[1].includes("_kidGuideFirstRobotDone"));
+assert.ok(gate.parameters[1].includes("=== 1"));
+const marked = tower.list.find((command) => command.code === 355 && String(command.parameters[0]).includes("_kidGuideFirstRobotDone = true"));
+assert.ok(marked);
+assert.ok(tower.list.some((command) => command.code === 401 && command.parameters[0].includes("全員升了一級")));
 
 const map18 = fs.readFileSync(new URL("../data/Map018.json", import.meta.url), "utf8");
 assert.ok(map18.includes("先去拿寶箱。"));
