@@ -23,7 +23,15 @@ const wide = assertFits("S3 wide", 2339, 1063, ["A", "B", "C", "D"]);
 assert.ok(wide.scalePercent < 100, "wide image must shrink");
 
 const normal = assertFits("S2 normal", 650, 205, ["A", "B", "C", "D"]);
-assert.equal(normal.scalePercent, 100, "image that already fits stays 100%");
+assert.ok(normal.scalePercent > 100 && normal.scalePercent <= 200, "spare space enlarges the picture");
+
+const tiny = assertFits("tiny", 80, 80, ["A", "B", "C", "D"]);
+assert.equal(tiny.scalePercent, 200, "enlargement stops at 2x");
+
+assert.equal(QuizPictureFit.hasRecordedAnswer({ Q_T: 4, C_A: "B" }), true);
+assert.equal(QuizPictureFit.hasRecordedAnswer({ Q_T: 4, C_A: "?" }), false);
+assert.equal(QuizPictureFit.hasRecordedAnswer({ Q_T: 9, C_A: "true" }), true);
+assert.equal(QuizPictureFit.hasRecordedAnswer({ Q_T: 9, C_A: "maybe" }), false);
 
 assertFits("S1 wide", 1466, 326, ["A", "B", "C", "D"]);
 assertFits("TSA tall", 980, 723, ["A", "B", "C", "D"]);

@@ -51,9 +51,11 @@ const cases = [
     ['nwcs211', `nwcs211@${domain}`],
     ['admin', `admin@${domain}`],
     [`mathai01@${domain}`, `mathai01@${domain}`],
+    ['mathai1', `mathai01@${domain}`],
+    ['mathai9', `mathai09@${domain}`],
+    [`mathai1@${domain}`, `mathai01@${domain}`],
     ['mathai00', 'mathai00'],
     ['mathai41', 'mathai41'],
-    ['mathai1', 'mathai1'],
     ['mathai', 'mathai']
 ];
 

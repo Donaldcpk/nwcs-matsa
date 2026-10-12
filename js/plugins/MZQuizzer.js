@@ -230,6 +230,30 @@
         }
 
         var question = questionList[qIndex];
+        var skipHops = 0;
+        while (
+            question &&
+            typeof QuizPictureFit !== "undefined" &&
+            !QuizPictureFit.hasRecordedAnswer(question)
+        ) {
+            skipHops++;
+            if (skipHops > questionList.length) {
+                $gameMessage.add("（這部分題目的答案表還沒有收錄）");
+                return;
+            }
+            if (diff === 4) {
+                qIndex = (qIndex + 1) % questionList.length;
+                $gameVariables.setValue(tsaLockVariableId, qIndex + 1);
+            } else {
+                qIndex += 1;
+                $gameVariables.setValue(992, qIndex);
+                if (qIndex >= questionList.length) {
+                    $gameMessage.add("（其餘題目的答案表還沒有收錄，這部分先跳過）");
+                    return;
+                }
+            }
+            question = questionList[qIndex];
+        }
         $gameVariables.setValue(995, 0); 
 
         // --- 3. 顯示圖片 ---
@@ -444,11 +468,18 @@
     var MZQ_WindowChoiceList_windowWidth = Window_ChoiceList.prototype.windowWidth;
     Window_ChoiceList.prototype.windowWidth = function() {
         if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowWidth.call(this);
-        const cols = Math.max(1, this.maxCols());
-        const colW = this.maxChoiceWidth();
-        const spacing = this.colSpacing();
-        const inner = (colW + spacing) * cols;
-        return Math.min(inner + this.padding * 2, Graphics.boxWidth);
+        return Graphics.boxWidth;
+    };
+
+    var MZQ_WindowChoiceList_drawItem = Window_ChoiceList.prototype.drawItem;
+    Window_ChoiceList.prototype.drawItem = function(index) {
+        if (!quizPictureOnScreen() || this.maxCols() <= 1) {
+            MZQ_WindowChoiceList_drawItem.call(this, index);
+            return;
+        }
+        const rect = this.itemLineRect(index);
+        this.resetTextColor();
+        this.drawText(this.commandName(index), rect.x, rect.y, rect.width, "center");
     };
 
     var MZQ_WindowChoiceList_windowX = Window_ChoiceList.prototype.windowX;

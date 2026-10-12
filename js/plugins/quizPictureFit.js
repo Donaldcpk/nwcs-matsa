@@ -35,12 +35,27 @@ var QuizPictureFit = QuizPictureFit || {};
         return messageH + choiceH + MARGIN;
     };
 
+    QuizPictureFit.hasRecordedAnswer = function(question) {
+        if (!question) return false;
+        var qt = Number(question.Q_T);
+        var ca = String(question.C_A == null ? '' : question.C_A).trim();
+        if (qt === 9) {
+            var low = ca.toLowerCase();
+            return low === 'true' || low === 'false';
+        }
+        if (qt >= 2 && qt <= 5) {
+            return ca.length === 1 && 'ABCDE'.slice(0, qt).indexOf(ca) >= 0;
+        }
+        return false;
+    };
+
     QuizPictureFit.layout = function(imgW, imgH, boxW, boxH, reserveBottom) {
         var maxW = Math.max(1, boxW - MARGIN * 2);
         var maxH = Math.max(1, boxH - reserveBottom - MARGIN);
         var scale = 1;
         if (imgW > 0 && imgH > 0) {
-            scale = Math.min(maxW / imgW, maxH / imgH, 1);
+            // 畫面還有空位時放大，上限 2 倍，字比較容易看；太大的圖仍縮小到放得下。
+            scale = Math.min(maxW / imgW, maxH / imgH, 2);
         }
         var scalePercent = Math.floor(scale * 1000) / 10;
         if (!(scalePercent > 0)) scalePercent = 0.1;

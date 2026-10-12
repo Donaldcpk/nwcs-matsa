@@ -19,11 +19,16 @@
         return String(CFG.studentEmailDomain || 'ngwahsec.edu.hk').replace(/^@/, '').toLowerCase();
     }
 
-    function isBackupMathai(local) {
-        var m = /^mathai(\d{2})$/.exec(local);
-        if (!m) return false;
+    function canonicalBackupLocal(local) {
+        var m = /^mathai(\d{1,2})$/.exec(local);
+        if (!m) return '';
         var n = parseInt(m[1], 10);
-        return n >= 1 && n <= 40;
+        if (n < 1 || n > 40) return '';
+        return 'mathai' + (n < 10 ? '0' : '') + n;
+    }
+
+    function isBackupMathai(local) {
+        return canonicalBackupLocal(local) !== '';
     }
 
     function isBackupMathaiEmail(email) {
@@ -49,8 +54,16 @@
             return String(CFG.adminAuthEmail || 'admin@' + domain).toLowerCase();
         }
         // 學生只打 s+7 位、老師只打 nwcs 編號、備用帳只打 mathai01–mathai40 時，自動補上學校電郵。
+        // mathai1 會補成 mathai01，避免少打一個 0 就登入不到。
+        var at = s.indexOf('@');
+        var localPart = at < 0 ? s : s.slice(0, at);
+        var host = at < 0 ? '' : s.slice(at + 1);
+        var backupLocal = canonicalBackupLocal(localPart);
+        if (backupLocal && (at < 0 || host === domain)) {
+            return backupLocal + '@' + domain;
+        }
         var localStaff = /^[a-z][a-z0-9._+-]*$/.test(s) && /^(nwcs|nwcsw|nwcsssw|nwcsies|nwcsptc)/.test(s);
-        if (/^s\d{7}$/.test(s) || /^nwcs\d+$/.test(s) || isBackupMathai(s) || (s.indexOf('@') < 0 && localStaff)) {
+        if (at < 0 && (/^s\d{7}$/.test(s) || /^nwcs\d+$/.test(s) || localStaff)) {
             return s + '@' + domain;
         }
         return s;
