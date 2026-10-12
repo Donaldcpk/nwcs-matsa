@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc 大廳與無限之塔：一句大字加上箭頭。先拿寶箱，再走右邊的門，然後打機械人。
+ * @plugindesc 大廳與無限之塔：一句大字加上箭頭。先拿寶箱，再去打機械人。
  * @author tower-setup
  *
  * 打贏機械人會自己跳下一層，所以塔裡不再叫學生去找下一層的門。
@@ -22,7 +22,8 @@ function kidGuideStep(state) {
                 : "走到寶箱，拿獎勵";
             return { eventId: chests[0].id, lines: [text] };
         }
-        return { eventId: 25, lines: ["走到右邊的門"] };
+        if (!state.enteredTower) return { eventId: 25, lines: ["走到右邊的門"] };
+        return { eventId: 25, lines: ["回去打機械人"] };
     }
     if (mapId === 65) {
         const floor = Number(state.floor) || 0;
@@ -80,18 +81,21 @@ if (typeof PluginManager !== "undefined") {
         { code: 101, indent: 0, parameters: ["", 0, 0, 2, ""] },
         { code: 401, indent: 0, parameters: ["先拿寶箱。"] },
         { code: 101, indent: 0, parameters: ["", 0, 0, 2, ""] },
-        { code: 401, indent: 0, parameters: ["再走到右邊的門。"] },
-        { code: 101, indent: 0, parameters: ["", 0, 0, 2, ""] },
-        { code: 401, indent: 0, parameters: ["碰到機械人就打。"] },
+        { code: 401, indent: 0, parameters: ["然後去打機械人。"] },
         { code: 401, indent: 0, parameters: ["贏了會自己去下一層，一直打到第 100 層。"] },
         { code: 0, indent: 0, parameters: [] }
     ];
 
     let introInterpreter = null;
 
+    function enteredTower() {
+        return !!($gameSystem && $gameSystem._kidGuideEnteredTower);
+    }
+
     function liveStep() {
         if (!$gameMap || !$gamePlayer) return null;
         const mapId = $gameMap.mapId();
+        if (mapId === 65 && $gameSystem) $gameSystem._kidGuideEnteredTower = true;
         if (mapId === 18) {
             const gold = $gameMap.event(26);
             const crown = $gameMap.event(17);
@@ -106,7 +110,8 @@ if (typeof PluginManager !== "undefined") {
                 crownY: crown.y,
                 px: $gamePlayer.x,
                 py: $gamePlayer.y,
-                floor: 0
+                floor: 0,
+                enteredTower: enteredTower()
             });
         }
         if (mapId === 65) {

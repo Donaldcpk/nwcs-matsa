@@ -29,9 +29,14 @@ const crownLeft = kidGuideStep({ ...lobby, goldOpen: true, crownOpen: false });
 assert.strictEqual(crownLeft.eventId, 17);
 assert.strictEqual(crownLeft.lines[0], "還有一個寶箱，走過去拿");
 
-const door = kidGuideStep({ ...lobby, goldOpen: true, crownOpen: true });
+const door = kidGuideStep({ ...lobby, goldOpen: true, crownOpen: true, enteredTower: false });
 assert.strictEqual(door.eventId, 25);
 assert.strictEqual(door.lines[0], "走到右邊的門");
+
+const back = kidGuideStep({ ...lobby, goldOpen: true, crownOpen: true, enteredTower: true });
+assert.strictEqual(back.eventId, 25);
+assert.strictEqual(back.lines[0], "回去打機械人");
+assert.ok(!back.lines[0].includes("右邊的門"));
 
 const floor3 = kidGuideStep({ mapId: 65, floor: 3, goldOpen: true, crownOpen: true, px: 0, py: 0 });
 assert.strictEqual(floor3.eventId, 25);
@@ -68,7 +73,9 @@ assert.ok(Math.abs(above.rotation - Math.PI) < 0.2);
 
 const map18 = fs.readFileSync(new URL("../data/Map018.json", import.meta.url), "utf8");
 assert.ok(map18.includes("先去拿寶箱。"));
-assert.ok(map18.includes("這扇門還沒開。請去拿寶箱，再走右邊的門。"));
+assert.ok(map18.includes("這扇門還沒開。"));
+assert.ok(!map18.includes("走右邊的門"));
+assert.ok(!map18.includes("再到右邊的門"));
 const map65 = JSON.parse(fs.readFileSync(new URL("../data/Map065.json", import.meta.url), "utf8"));
 const robot = map65.events.find((event) => event && event.id === 25);
 assert.strictEqual(robot.pages[0].trigger, 1);
