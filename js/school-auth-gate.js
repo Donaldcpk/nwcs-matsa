@@ -26,6 +26,22 @@
         return n >= 1 && n <= 40;
     }
 
+    function isBackupMathaiEmail(email) {
+        var local = String(email || '').toLowerCase().split('@')[0];
+        return isBackupMathai(local);
+    }
+
+    function backupLoginError() {
+        return '備用帳登入失敗。請輸入 mathai01 到 mathai40，密碼用老師派發的備用密碼。';
+    }
+
+    function shouldAutoRegister(email, errorMessage) {
+        var msg = String(errorMessage || '').toLowerCase();
+        if (msg.indexOf('太多') >= 0 || msg === '429' || msg.indexOf('too many') >= 0) return false;
+        if (isBackupMathaiEmail(email)) return false;
+        return msg.indexOf('invalid') >= 0 || msg.indexOf('credential') >= 0 || msg.indexOf('password') >= 0;
+    }
+
     function normalizeEmail(raw) {
         var s = String(raw || '').trim().toLowerCase();
         var domain = schoolDomain();
@@ -294,13 +310,13 @@
                 try {
                     data = await signInWithRetry(email, password);
                 } catch (e1) {
-                    var msg1 = String(e1.message || e1 || '').toLowerCase();
-                    if (msg1.indexOf('太多') >= 0 || msg1 === '429') throw e1;
-                    var tryRegister =
-                        msg1.indexOf('invalid') >= 0 ||
-                        msg1.indexOf('credential') >= 0 ||
-                        msg1.indexOf('password') >= 0;
-                    if (!tryRegister) throw e1;
+                    var msg1 = String(e1.message || e1 || '');
+                    if (!shouldAutoRegister(email, msg1)) {
+                        if (isBackupMathaiEmail(email) && msg1.indexOf('太多') < 0 && msg1 !== '429') {
+                            throw new Error(backupLoginError());
+                        }
+                        throw e1;
+                    }
                     try {
                         var up = await signUp(email, password);
                         if (up.session && up.session.access_token) {
@@ -378,6 +394,8 @@
     }
 
     window.NWCS_normalizeSchoolLogin = normalizeEmail;
+    window.NWCS_shouldAutoRegister = shouldAutoRegister;
+    window.NWCS_backupLoginError = backupLoginError;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', start);

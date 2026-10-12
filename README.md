@@ -68,7 +68,7 @@ node tools/provision_supabase_auth_users.mjs --backup-mathai
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.1`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.2`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 

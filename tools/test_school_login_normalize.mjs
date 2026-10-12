@@ -68,6 +68,37 @@ for (const [input, expected] of cases) {
     }
 }
 
+const shouldAutoRegister = windowObj.NWCS_shouldAutoRegister;
+if (typeof shouldAutoRegister !== 'function') {
+    throw new Error('登入程式沒有露出 NWCS_shouldAutoRegister');
+}
+
+const autoCases = [
+    [`mathai01@${domain}`, 'Invalid login credentials', false],
+    [`mathai40@${domain}`, 'Invalid login credentials', false],
+    [`s1234567@${domain}`, 'Invalid login credentials', true],
+    [`nwcs211@${domain}`, 'Invalid login credentials', true],
+    [`mathai01@${domain}`, '429', false],
+    [`s1234567@${domain}`, '同一時間登入的人太多', false]
+];
+for (const [email, message, expected] of autoCases) {
+    const got = shouldAutoRegister(email, message);
+    if (got !== expected) {
+        failed++;
+        console.error(`[FAIL] auto ${email} ${message} => ${got}，預期 ${expected}`);
+    } else {
+        console.log(`[OK] auto ${email} => ${got}`);
+    }
+}
+
+const backupMsg = windowObj.NWCS_backupLoginError();
+if (!backupMsg.includes('備用密碼') || backupMsg.includes('出生日期')) {
+    failed++;
+    console.error('[FAIL] 備用帳錯誤訊息不對：' + backupMsg);
+} else {
+    console.log('[OK] backup message');
+}
+
 if (failed) {
     process.exit(1);
 }
