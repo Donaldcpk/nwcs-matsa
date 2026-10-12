@@ -41,6 +41,29 @@
     const pluginName = "OmniscientEncyclopedia";
     const parameters = PluginManager.parameters(pluginName);
     const scoreVarId = Number(parameters['scoreVariableId'] || 10);
+    // 2627 學年排名重新計算。舊列留在原表，畫面只顯示這個時間之後同步的分數。
+    const RANKING_SEASON = "2627";
+    const RANKING_SEASON_START = "2026-10-12T08:00:00.000Z";
+
+    function applyFreshRankingSeason() {
+        if (typeof $gameSystem === "undefined" || !$gameSystem) return;
+        if (typeof $gameVariables === "undefined" || !$gameVariables) return;
+        if ($gameSystem._rankingSeason === RANKING_SEASON) return;
+        $gameSystem._rankingSeason = RANKING_SEASON;
+        $gameVariables.setValue(scoreVarId, 0);
+    }
+
+    const _DataManager_setupNewGame_Rank = DataManager.setupNewGame;
+    DataManager.setupNewGame = function() {
+        _DataManager_setupNewGame_Rank.call(this);
+        applyFreshRankingSeason();
+    };
+
+    const _DataManager_extractSaveContents_Rank = DataManager.extractSaveContents;
+    DataManager.extractSaveContents = function(contents) {
+        _DataManager_extractSaveContents_Rank.call(this, contents);
+        applyFreshRankingSeason();
+    };
 
     // ======================================================================
     // 1. Game_System - 初始化圖鑑資料庫與加分邏輯
@@ -376,7 +399,10 @@ class NetworkManager {
     static async fetchTop50(orderBy) {
         await this.refreshUserSessionIfNeeded();
         const base = this.getBaseUrl();
-        const url = `${base}/rest/v1/global_leaderboard?select=*&order=${orderBy}.desc&limit=50`;
+        const since = encodeURIComponent(RANKING_SEASON_START);
+        const url =
+            `${base}/rest/v1/global_leaderboard?select=*&updated_at=gte.${since}` +
+            `&order=${orderBy}.desc&limit=50`;
         const key = this.getKey();
         const bearer = this.getBearerForRest();
 
@@ -757,6 +783,7 @@ class Window_LeaderboardDetail extends Window_Base {
         if (this._sortKey === 'score') {
             return head.concat([
                 "\\C[14]【積分】",
+                "2627 學年排名由這次更新起重新計算。",
                 "圖鑑總分愈高名次愈前。",
                 "解鎖圖鑑會加分；備註可設分數，預設+10。",
                 "衝榜：多解鎖圖鑑。",

@@ -295,6 +295,7 @@
             '<p class="school-login-hint">學生：登入名稱是互聯網登入（<strong>s</strong> 後面 7 個數字）。密碼是出生日期 <strong>8 位</strong>，年份在前。</p>' +
             '<p class="school-login-hint">老師：登入名稱是學校電郵或 nwcs 編號。密碼是校方已發的密碼。管理帳號可輸入 admin。</p>' +
             '<p class="school-login-hint">備用帳號：只輸入 <strong>mathai01</strong> 到 <strong>mathai40</strong>（不用打 @）。密碼用老師派發的備用密碼。</p>' +
+            '<p class="school-login-hint">例子：登入名稱 <strong>s1234567</strong>，密碼 <strong>20261012</strong>。</p>' +
             '<label class="school-login-label">登入名稱</label>' +
             '<input type="text" id="schoolLoginEmail" class="school-login-input" autocomplete="username" autocapitalize="none" spellcheck="false" />' +
             '<label class="school-login-label">密碼</label>' +
