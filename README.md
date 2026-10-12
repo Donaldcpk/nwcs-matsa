@@ -27,6 +27,7 @@ python3 -m http.server 8080
 - 老師登入名稱填學校電郵或 nwcs 編號，密碼填校方已發的密碼。老師密碼不會改成出生日期。
 - 備用帳號只填 `mathai01` 到 `mathai40`（不用打 @）。少打一個 0 也可以，例如 `mathai1` 會當成 `mathai01`。密碼用老師派發的備用密碼，不寫在這個網頁或程式庫裡。密碼打錯不會開新帳。
 - 進入遊戲後選年級與中文或英文，依畫面作答。
+- 開新遊戲時，悠真、莉娜、米勒、塞拉都是 4 級。
 - 題目圖會縮放成完整放進畫面；還有空位時會放大，最多 2 倍。答案按鈕在畫面下方排成一列，並佔滿寬度。
 - 答案表還沒有 A–D 的題會自動跳過。
 - 題目圖片在 `img` 對應資料夾；題號來自檔名，例如 `JSMATH1A01MCQ2.png` 是中一 1A01 第 2 題。
@@ -69,7 +70,7 @@ node tools/provision_supabase_auth_users.mjs --backup-mathai
 
 ## 版本與變更
 
-- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.3`。
+- 版本規則：Semantic Versioning（`主版.次版.修訂`）。目前為 `0.3.4`。
 - 變更紀錄：[CHANGELOG.md](CHANGELOG.md)
 - 提交訊息：Conventional Commits，例如 `fix(quiz): 修正選擇題正確答案`。
 
