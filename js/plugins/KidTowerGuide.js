@@ -4,6 +4,7 @@
  * @author tower-setup
  *
  * 打贏機械人會自己跳下一層，所以塔裡不再叫學生去找下一層的門。
+ * 第一次打贏機械人之後，箭頭會收起來；底下的大字仍然留著。
  */
 function kidGuideStep(state) {
     const mapId = Number(state.mapId);
@@ -69,8 +70,19 @@ function kidGuideArrowPlacement(targetX, targetY, boxW, boxH, margin) {
     };
 }
 
+// 第一次打贏機械人後，箭頭和頭上的驚嘆號都不再出現。大字提示不受這個影響。
+function kidGuideShowArrow(state) {
+    if (!state || state.firstRobotDone) return false;
+    return Number(state.eventId) > 0;
+}
+
 if (typeof module !== "undefined" && module.exports && typeof PluginManager === "undefined") {
-    module.exports = { kidGuideStep: kidGuideStep, kidGuideDoorAllowed: kidGuideDoorAllowed, kidGuideArrowPlacement: kidGuideArrowPlacement };
+    module.exports = {
+        kidGuideStep: kidGuideStep,
+        kidGuideDoorAllowed: kidGuideDoorAllowed,
+        kidGuideArrowPlacement: kidGuideArrowPlacement,
+        kidGuideShowArrow: kidGuideShowArrow
+    };
 }
 
 if (typeof PluginManager !== "undefined") {
@@ -242,9 +254,16 @@ if (typeof PluginManager !== "undefined") {
     Spriteset_Map.prototype.updateKidGuideArrow = function() {
         const arrow = this._kidGuideArrow;
         if (!arrow) return;
+        if ($gameSystem && $gameVariables && Number($gameVariables.value(202)) >= 2) {
+            $gameSystem._kidGuideFirstRobotDone = true;
+        }
         const step = liveStep();
         const event = step && step.eventId ? $gameMap.event(step.eventId) : null;
-        if (!event || $gameMessage.isBusy()) {
+        const show = kidGuideShowArrow({
+            firstRobotDone: !!($gameSystem && $gameSystem._kidGuideFirstRobotDone),
+            eventId: event ? step.eventId : 0
+        });
+        if (!show || $gameMessage.isBusy()) {
             arrow.visible = false;
             return;
         }
