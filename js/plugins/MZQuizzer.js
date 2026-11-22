@@ -3,7 +3,7 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc [v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡）
+ * @plugindesc [v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡；題圖縮到畫面內）
  * @author Starbird (Modified by Senior Programmer)
  *
  * @command getQuestion
@@ -43,6 +43,10 @@
  * [v1.5.0] 開場先選年級，再選範圍（數與代數、圖形與空間、數據處理），然後選課題。選好遊戲才開始。
  *         選單有「選擇課題」。換課題會從第 1 題再開始。舊存檔若沒選課題，第一場戰鬥會先叫你選。
  *
+ * [v1.4.7] 題目圖片若比畫面大，會縮小並置中，避免右邊或下邊的字被切掉。
+ *         答題時 A／B／C／D 改成畫面下方一整列，四個選項都會在畫面裡。
+ *         瀏覽器視窗比遊戲小時，整頁會縮小以完整顯示，不再裁掉右下角。
+ *
  * [v1.4.6] 題庫「T」>0 時視為倒數幀數（60幀=1秒，如 900=15秒），逾時視同答錯。
  *         題庫「T」>0 時視為倒數幀數（60幀=1秒，如 900=15秒），逾時視同答錯；勿再併用事件「計時器」（到期會中止戰鬥）。
  *         軍團事件：在適當頁（如回合 0、戰鬥開始）只放插件指令「MZQuizzer → getQuestion」即可，倒數由題庫 T 控制。
@@ -80,6 +84,8 @@
     if (quizMessageLineCount < 1) quizMessageLineCount = 1;
     if (quizMessageLineCount > 4) quizMessageLineCount = 4;
     const tsaLockVariableId = Number(parameters['TsaLockVariableId'] || 988);
+    const QUIZ_PICTURE_ID = 98;
+
     const topicVariableId = 980;
 
     function mzqDecodeTopic(code) {
@@ -253,6 +259,44 @@
     let _mzqExpireFrame = 0;
     let _mzqPending = null;
 
+    Graphics._defaultStretchMode = function() {
+        return true;
+    };
+
+    function quizPictureOnScreen() {
+        if (typeof $gameScreen === "undefined" || !$gameScreen) return false;
+        const pic = $gameScreen.picture(QUIZ_PICTURE_ID);
+        return !!(pic && pic.name());
+    }
+
+    function applyQuizPictureFit(bitmap, choices) {
+        const pic = $gameScreen.picture(QUIZ_PICTURE_ID);
+        if (!pic || !bitmap || !bitmap.width || !bitmap.height) return;
+        if (typeof QuizPictureFit === "undefined") return;
+        const horizontal = QuizPictureFit.choicesAreShort(choices);
+        const reserve = QuizPictureFit.bottomReserve(
+            choices && choices.length ? choices.length : 4,
+            horizontal
+        );
+        const layout = QuizPictureFit.layout(
+            bitmap.width,
+            bitmap.height,
+            Graphics.boxWidth,
+            Graphics.boxHeight,
+            reserve
+        );
+        pic._origin = 0;
+        pic._x = layout.x;
+        pic._y = layout.y;
+        pic._scaleX = layout.scalePercent;
+        pic._scaleY = layout.scalePercent;
+        pic._targetX = layout.x;
+        pic._targetY = layout.y;
+        pic._targetScaleX = layout.scalePercent;
+        pic._targetScaleY = layout.scalePercent;
+        pic._duration = 0;
+    }
+
     const _Window_Message_startMessage = Window_Message.prototype.startMessage;
     Window_Message.prototype.startMessage = function () {
         const scene = SceneManager._scene;
@@ -264,8 +308,9 @@
             scene instanceof Scene_Battle;
         if (isBattleMsg && scene.calcWindowHeight) {
             const narrow =
-                quizPromptSubstring.length > 0 && text.indexOf(quizPromptSubstring) >= 0;
-            const lines = narrow ? quizMessageLineCount : 4;
+                quizPictureOnScreen() ||
+                (quizPromptSubstring.length > 0 && text.indexOf(quizPromptSubstring) >= 0);
+            const lines = quizPictureOnScreen() ? 1 : (narrow ? quizMessageLineCount : 4);
             const ww = Graphics.boxWidth;
             const wh = scene.calcWindowHeight(lines, false) + 8;
             this.move(0, this.y, ww, wh);
@@ -341,6 +386,30 @@
         }
 
         var question = questionList[qIndex];
+        var skipHops = 0;
+        while (
+            question &&
+            typeof QuizPictureFit !== "undefined" &&
+            !QuizPictureFit.hasRecordedAnswer(question)
+        ) {
+            skipHops++;
+            if (skipHops > questionList.length) {
+                $gameMessage.add("（這部分題目的答案表還沒有收錄）");
+                return;
+            }
+            if (diff === 4) {
+                qIndex = (qIndex + 1) % questionList.length;
+                $gameVariables.setValue(tsaLockVariableId, qIndex + 1);
+            } else {
+                qIndex += 1;
+                $gameVariables.setValue(992, qIndex);
+                if (qIndex >= questionList.length) {
+                    $gameMessage.add("（其餘題目的答案表還沒有收錄，這部分先跳過）");
+                    return;
+                }
+            }
+            question = questionList[qIndex];
+        }
         $gameVariables.setValue(995, 0); 
 
         // --- 3. 顯示圖片 ---
@@ -353,16 +422,19 @@
             picName = question.GUID;
         }
 
+        var quizBitmap = null;
         if (picName !== "") {
             picName = picName.replace(/\.(png|jpg|jpeg)$/i, "");
             var finalPath = folderPrefix + picName;
-            $gameScreen.showPicture(98, finalPath, 0, 0, 0, 100, 100, 255, 0);
+            $gameScreen.showPicture(QUIZ_PICTURE_ID, finalPath, 0, 0, 0, 100, 100, 255, 0);
+            quizBitmap = ImageManager.loadPicture(finalPath);
         }
 
         // --- 4. 處理文字與選項 ---
         var qText = question.Q;
         if (question.E === 1) qText = atob(rotHex(qText));
         qText = qText.replace(/(?:\r\n|\r|\n)/g, '\\n');
+        if (qText === "MCQ") qText = "請選答案";
         $gameMessage.add(qText);
 
         var choices = [];
@@ -423,6 +495,13 @@
             } else {
                 _mzqExpireFrame = 0;
                 _mzqPending = null;
+            }
+
+            if (quizBitmap) {
+                var fitChoices = choices.slice();
+                quizBitmap.addLoadListener(function() {
+                    applyQuizPictureFit(quizBitmap, fitChoices);
+                });
             }
 
             $gameMessage.setChoices(choices, 0, -1);
@@ -519,6 +598,57 @@
     }
 
     function rotHex(s) { return s; }
+
+    var MZQ_WindowChoiceList_maxCols = Window_ChoiceList.prototype.maxCols;
+    Window_ChoiceList.prototype.maxCols = function() {
+        if (!quizPictureOnScreen() || typeof QuizPictureFit === "undefined") {
+            return MZQ_WindowChoiceList_maxCols.call(this);
+        }
+        const choices = $gameMessage.choices();
+        return QuizPictureFit.choicesAreShort(choices) ? choices.length : 1;
+    };
+
+    var MZQ_WindowChoiceList_numVisibleRows = Window_ChoiceList.prototype.numVisibleRows;
+    Window_ChoiceList.prototype.numVisibleRows = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_numVisibleRows.call(this);
+        const choices = $gameMessage.choices();
+        const cols = Math.max(1, this.maxCols());
+        return Math.max(1, Math.ceil(choices.length / cols));
+    };
+
+    var MZQ_WindowChoiceList_windowWidth = Window_ChoiceList.prototype.windowWidth;
+    Window_ChoiceList.prototype.windowWidth = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowWidth.call(this);
+        return Graphics.boxWidth;
+    };
+
+    var MZQ_WindowChoiceList_drawItem = Window_ChoiceList.prototype.drawItem;
+    Window_ChoiceList.prototype.drawItem = function(index) {
+        if (!quizPictureOnScreen() || this.maxCols() <= 1) {
+            MZQ_WindowChoiceList_drawItem.call(this, index);
+            return;
+        }
+        const rect = this.itemLineRect(index);
+        this.resetTextColor();
+        this.drawText(this.commandName(index), rect.x, rect.y, rect.width, "center");
+    };
+
+    var MZQ_WindowChoiceList_windowX = Window_ChoiceList.prototype.windowX;
+    Window_ChoiceList.prototype.windowX = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowX.call(this);
+        return Math.max(0, Math.floor((Graphics.boxWidth - this.windowWidth()) / 2));
+    };
+
+    var MZQ_WindowChoiceList_windowY = Window_ChoiceList.prototype.windowY;
+    Window_ChoiceList.prototype.windowY = function() {
+        if (!quizPictureOnScreen()) return MZQ_WindowChoiceList_windowY.call(this);
+        const messageY = this._messageWindow ? this._messageWindow.y : Graphics.boxHeight;
+        let y = messageY - this.windowHeight();
+        const maxY = Graphics.boxHeight - this.windowHeight();
+        if (y > maxY) y = maxY;
+        if (y < 0) y = 0;
+        return y;
+    };
 
     var MZQ_WindowChoiceList_callCancelHandler = Window_ChoiceList.prototype.callCancelHandler;
     Window_ChoiceList.prototype.callCancelHandler = function() {

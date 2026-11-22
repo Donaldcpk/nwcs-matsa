@@ -3,7 +3,7 @@
 
 已處理
 ------
-- .gitignore：whitelist_inserts.sql、*.local.sql、school-auth-config.secret.js 等
+- .gitignore：whitelist_inserts.sql、*.local.sql、school-auth-config.secret.js、tools/.env.supabase.local、密碼 CSV 等
 - MZ_AIFairyCompanion 的 OpenRouter apiKey 已清空；若曾外洩請到 OpenRouter 撤銷舊金鑰
 - 登入設定拆成 defaults + secret（範本可提交，真值放 secret 不提交）
 

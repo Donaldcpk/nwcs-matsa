@@ -3,9 +3,11 @@
 var $plugins =
 [
 {"name":"TorigoyaMZ_EnemyHpBar","status":true,"description":"敵にHPバーを表示プラグイン (v.1.3.2)","parameters":{"base":"","basePosition":"top","basePosX":"0","basePosY":"0","customize":"","customizeCondition":"always","customizeGaugeWidth":"100","customizeGaugeHeight":"10","customizeDrawLabel":"true","customizeLabelWidth":"15","customizeLabelFontSize":"15","customizeValueFontSize":"15","customizeMaskHpValue":"?????"}},
+{"name":"quizPictureFit","status":true,"description":"計算題目圖片縮放，避免字被畫面切掉","parameters":{}},
 {"name":"MZQuizzer","status":true,"description":"[v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡）","parameters":{"penaltyStateId":"300","quizPromptSubstring":"請看題目圖片","quizMessageLineCount":"2","TsaLockVariableId":"988"}},
 {"name":"TowerShopTiers","status":true,"description":"[v1.0] Map65 商店進階／隱藏破爛與分類列","parameters":{"towerMapId":"65","levelThreshold":"50","priceMultiplier":"1.75"}},
 {"name":"TowerFloorDisplayName","status":true,"description":"Map65 顯示無限之塔第N層","parameters":{"mapId":"65","floorVariableId":"202"}},
+{"name":"KidTowerGuide","status":true,"description":"大廳與塔內：大字和箭頭，先拿寶箱、走右邊的門、打機械人","parameters":{}},
 {"name":"questionDatabase","status":true,"description":"","parameters":{}},
 {"name":"Kurimanju_Farm","status":true,"description":"[v1.0 農場系統] 真實時間種植、頭頂倒數、收成提醒。","parameters":{"LoadAlert":"true","AlertMessage":"歡迎回來！農田裡有作物已經成熟可以收割囉。","TimerFontSize":"12","TimerOffsetY":"-48"}},
 {"name":"MathVerse_Minimap","status":true,"description":"【數界雷達 v7.0】 - 道具解鎖、真實路徑 100% 計算、全息藍圖風格","parameters":{"OptionName":"數界雷達顯示","UnlockItemId":"2","MinimapY":"70"}},
