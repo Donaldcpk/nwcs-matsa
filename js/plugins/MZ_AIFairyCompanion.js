@@ -14,21 +14,21 @@
  * 5. 擁有完整的「等待進度條」與輸入防呆機制，不再卡死遊戲。
  * ============================================================================
  * * 使用方式：
- * 1. 在插件參數中填入你的 OpenRouter API Key。
+ * 1. 在插件參數中填入你的 Google AI Studio API Key (AIza...)。
  * 2. 設定小精靈的行走圖與索引。
  * 3. 進入地圖後，左下角會出現小精靈圖示，點擊即可互動。
  *
  * @param apiKey
- * @text OpenRouter API Key
- * @desc 你的 OpenRouter 密鑰 (sk-or-...)
+ * @text Google AI Studio API Key
+ * @desc 你的 Google AI Studio 金鑰 (AIza...)
  * @type text
  * @default 
  *
  * @param aiModel
  * @text AI 模型
- * @desc 預設使用你指定的免費視覺模型
+ * @desc 填入你要使用的模型名稱，例如：gemma-4-e4b-it 或 gemini-2.5-flash
  * @type text
- * @default nvidia/nemotron-nano-12b-v2-vl:free
+ * @default gemma-4-e4b-it
  *
  * @param systemPrompt
  * @text 系統提示詞 (System Prompt)
@@ -68,7 +68,7 @@
     const pluginName = "MZ_AIFairyCompanion";
     const parameters = PluginManager.parameters(pluginName);
     const API_KEY = parameters['apiKey'] || "";
-    const AI_MODEL = parameters['aiModel'] || "nvidia/nemotron-nano-12b-v2-vl:free";
+    const AI_MODEL = String(parameters["aiModel"] || "gemma-4-31b-it").trim();
     const COST_PER_ASK = Number(parameters['costPerAsk'] || 500);
     
     let SYSTEM_PROMPT = "";
@@ -81,6 +81,13 @@
     const FAIRY_IMAGE = parameters['fairyImage'];
     const FAIRY_INDEX = Number(parameters['fairyIndex'] || 0);
     const PROGRESS_VAR_ID = Number(parameters['progressVarId'] || 0);
+
+    function mzqActiveQuestionList() {
+        if (typeof window.MZQ_questionList === "function") {
+            return window.MZQ_questionList();
+        }
+        return null;
+    }
 
     // -------------------------------------------------------------------------
     // 1. Game_System 擴充 (儲存對話紀錄)
@@ -151,29 +158,9 @@
                 context.push(`敵人: ${enemies}`);
             }
             // 嘗試從 MZQuizzer 獲取當前題目資料
-            if (typeof window.questionDatabase !== 'undefined') {
-                let diff = $gameVariables.value(990) || 1;
-                let lang = $gameVariables.value(989) || 1;
+            if (typeof window.MZQ_questionList === "function" || typeof window.questionDatabase !== "undefined") {
                 let qIndex = $gameVariables.value(992) || 0;
-                
-                let diffStr = diff === 1 ? "S1" : diff === 2 ? "S2" : diff === 3 ? "S3" : "";
-                let langStr = lang === 1 ? "CH" : lang === 2 ? "EN" : "";
-                
-                // 更精準地獲取當前分類
-            let categoryKey = "Questions";
-            if (diffStr !== "" && langStr !== "") {
-                categoryKey = diffStr + "_" + langStr;
-            } else if (diff === 1) { 
-                categoryKey = "S1MCQ"; 
-            } else if (diff === 2) { 
-                categoryKey = "S2MCQ"; 
-            }
-            
-            let qList = window.questionDatabase[categoryKey];
-            
-            if (!qList && window.questionDatabase["Questions"]) {
-                qList = window.questionDatabase["Questions"];
-            }
+                let qList = mzqActiveQuestionList();
             
             // 嘗試透過目前顯示的圖片 (Picture 98) 來反推是哪一題
             let currentPicName = "";
@@ -297,21 +284,7 @@
         if (useVision) {
             // 如果是在戰鬥中且有題目，我們可以把題目的圖片路徑傳給 AI
             let qIndex = $gameVariables.value(992) || 0;
-            let diff = $gameVariables.value(990) || 1;
-            let lang = $gameVariables.value(989) || 1;
-            
-            let diffStr = diff === 1 ? "S1" : diff === 2 ? "S2" : diff === 3 ? "S3" : "";
-            let langStr = lang === 1 ? "CH" : lang === 2 ? "EN" : "";
-            let categoryKey = "Questions";
-            if (diffStr && langStr) {
-                categoryKey = diffStr + "_" + langStr;
-            } else if (diff === 1) { categoryKey = "S1MCQ"; }
-            else if (diff === 2) { categoryKey = "S2MCQ"; }
-            
-            let qList = typeof window.questionDatabase !== 'undefined' ? window.questionDatabase[categoryKey] : null;
-            if (!qList && typeof window.questionDatabase !== 'undefined' && window.questionDatabase["Questions"]) {
-                qList = window.questionDatabase["Questions"];
-            }
+            let qList = mzqActiveQuestionList();
 
             let qData = null;
             // 找出真正的 qData
@@ -396,11 +369,11 @@
         // 強制附加系統級限制，確保 AI 不會亂回答
         const strictRules = `\n【最高指導原則】：
 1. 絕對只使用「繁體中文」回答。
-2. 玩家會提供遊戲畫面截圖，請務必「仔細觀察圖片中的數學算式與選項 (A,B,C,D)」。此截圖是真實的遊戲畫面，請完全信任並分析截圖內的文字、數字與算式。如果截圖中有清楚的算式，請以此為準。
-3. 嚴禁憑空捏造劇情（例如火精靈、黃昏護盾等不相干字眼）。
-4. 數學公式一律使用 LaTeX 格式（例如：$E=mc^2$）。
+2. 玩家會提供遊戲畫面截圖，請務必「仔細觀察圖片中的數學算式與選項 (A,B,C,D)」，並據此找出答案。
+3. 請耐心且有指引地解釋解題步驟，但務必保持「簡單明確、扼要到位」，不要長篇大論。
+4. 數學公式與符號一律使用 LaTeX 格式（行內請用 $...$ ，獨立行請用 $$...$$），確保數學排版合理美觀。
 5. 絕對禁止在回覆中講出題目圖片的檔名或名稱 (例如 3A01MCQ5 等)。
-6. 【極度重要】請確保你的計算過程完全符合基礎數學邏輯！請反覆驗算你的推導結果是否正確。`;
+6. 【極度重要】請確保你的計算過程完全符合基礎數學邏輯！反覆驗算你的推導結果是否與選項相符。`;
         
         if (!finalSystemPrompt.includes("最高指導原則")) {
             finalSystemPrompt += strictRules;
@@ -415,13 +388,12 @@
         };
 
         try {
-            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            // 改為呼叫 Google AI Studio 的 OpenAI 相容端點
+            const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${API_KEY}`,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": window.location.href || "https://localhost",
-                    "X-Title": "MZ AI Fairy Game"
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify(payload)
             });
@@ -590,52 +562,53 @@
             chatWindow.appendChild(inputArea);
 
             // --- 左下角圓形小圖示 ---
+            const iconContainer = document.createElement('div');
+            iconContainer.id = 'ai-fairy-icon-container';
+            iconContainer.style.position = 'relative';
+            iconContainer.style.width = '40px';
+            iconContainer.style.height = '40px';
+            iconContainer.style.cursor = 'pointer';
+
             const icon = document.createElement('div');
             icon.id = 'ai-fairy-icon';
-            // 為了讓它像 1/3 大小，我們設定長寬為 40x40 (相對於原生48x48再小一點)
-            icon.style.width = '40px';
-            icon.style.height = '40px';
+            icon.style.width = '100%';
+            icon.style.height = '100%';
             icon.style.backgroundColor = 'rgba(255,255,255,0.8)';
             icon.style.border = '2px solid #5c9fd6';
             icon.style.borderRadius = '50%';
             icon.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
-            icon.style.cursor = 'pointer';
             icon.style.display = 'flex';
             icon.style.justifyContent = 'center';
             icon.style.alignItems = 'center';
             icon.style.overflow = 'hidden';
             icon.style.transition = 'transform 0.2s';
+            icon.innerHTML = '<span style="font-size: 20px;">🧚</span>'; 
             
             // 加入 hover 效果
-            icon.onmouseover = () => icon.style.transform = 'scale(1.1)';
-            icon.onmouseout = () => icon.style.transform = 'scale(1)';
-
-            const iconImg = document.createElement('img');
-            iconImg.id = 'ai-fairy-icon-img';
-            iconImg.style.maxWidth = '100%';
-            iconImg.style.maxHeight = '100%';
-            iconImg.alt = 'AI';
-            // 預設給個Emoji，等圖片載入後會替換
-            icon.innerHTML = '<span style="font-size: 20px;">🧚</span>'; 
+            iconContainer.onmouseover = () => icon.style.transform = 'scale(1.1)';
+            iconContainer.onmouseout = () => icon.style.transform = 'scale(1)';
             
             // 紅色驚嘆號提示
             const badge = document.createElement('div');
             badge.id = 'ai-fairy-badge';
             badge.innerText = '❗️';
             badge.style.position = 'absolute';
-            badge.style.top = '-5px';
-            badge.style.right = '-5px';
-            badge.style.fontSize = '16px';
+            badge.style.top = '-8px';
+            badge.style.right = '-8px';
+            badge.style.fontSize = '18px';
             badge.style.display = 'none'; // 預設隱藏
             badge.style.pointerEvents = 'none';
-            icon.appendChild(badge);
+            badge.style.zIndex = '10';
+
+            iconContainer.appendChild(icon);
+            iconContainer.appendChild(badge);
             
             wrapper.appendChild(chatWindow);
-            wrapper.appendChild(icon);
+            wrapper.appendChild(iconContainer);
             document.body.appendChild(wrapper);
 
             // --- 綁定事件 ---
-            icon.addEventListener('click', (e) => {
+            iconContainer.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // 點擊時隱藏提示
                 const currentBadge = document.getElementById('ai-fairy-badge');
@@ -721,7 +694,20 @@
             
             const iconDiv = document.getElementById('ai-fairy-icon');
             if (iconDiv) {
-                iconDiv.innerHTML = `<img src="${canvas.toDataURL()}" style="width: 150%; height: 150%; object-fit: cover; object-position: center 20%;" />`;
+                let img = document.getElementById('ai-fairy-icon-img');
+                if (!img) {
+                    img = document.createElement('img');
+                    img.id = 'ai-fairy-icon-img';
+                    iconDiv.insertBefore(img, iconDiv.firstChild);
+                }
+                img.src = canvas.toDataURL();
+                img.style.width = '150%';
+                img.style.height = '150%';
+                img.style.objectFit = 'cover';
+                img.style.objectPosition = 'center 20%';
+                
+                const emojiSpan = iconDiv.querySelector('span');
+                if (emojiSpan) emojiSpan.remove();
             }
         }
 

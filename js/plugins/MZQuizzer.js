@@ -3,12 +3,16 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc [v1.4.6] Quiz Engine（TSA 答錯同一題；題庫 T 欄可倒數逾時算錯）
+ * @plugindesc [v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡）
  * @author Starbird (Modified by Senior Programmer)
- * @help MZ-Quiz-Engine.js
  *
  * @command getQuestion
- * @desc Pulls the question based on Variable 992.
+ * @text 出題
+ * @desc 依照玩家選好的課題出題。
+ *
+ * @command chooseTopic
+ * @text 選擇課題
+ * @desc 讓玩家選年級、中文或英文，再選課題。選好後該課從第 1 題開始。
  *
  * @param penaltyStateId
  * @text 懲罰狀態 ID (跳過回合)
@@ -36,7 +40,10 @@
  * @default 988
  *
  * @help 
- * [v1.4.6] TSA（Var 990=4）：以變數鎖定題號，答錯再出題時仍為同一題，與塔模式一致。
+ * [v1.5.0] 開場先選年級，再選範圍（數與代數、圖形與空間、數據處理），然後選課題。選好遊戲才開始。
+ *         選單有「選擇課題」。換課題會從第 1 題再開始。舊存檔若沒選課題，第一場戰鬥會先叫你選。
+ *
+ * [v1.4.6] 題庫「T」>0 時視為倒數幀數（60幀=1秒，如 900=15秒），逾時視同答錯。
  *         題庫「T」>0 時視為倒數幀數（60幀=1秒，如 900=15秒），逾時視同答錯；勿再併用事件「計時器」（到期會中止戰鬥）。
  *         軍團事件：在適當頁（如回合 0、戰鬥開始）只放插件指令「MZQuizzer → getQuestion」即可，倒數由題庫 T 控制。
  *
@@ -58,9 +65,10 @@
  *    - 插件現在會全權負責狀態的施加與解除，事件裡多寫反而會導致衝突（例如答對了卻被事件誤判為答錯而施加狀態）。
  *
  * === 設定變量 ===
- * Var 990: 模式 (1=S1, 2=S2, 3=S3, 4=TSA 操練)
- * Var 989: 語言 (1=中文, 2=英文) ※TSA 模式會忽略，僅用圖片題
- * Var 992: 非 TSA：當前題號（答對 +1）。TSA：題號由「TSA 鎖定變數」保存，答對才清掉並下次再隨機
+ * Var 980: 課題代碼（1A01=1001、1B07=1107。0 代表還沒選）
+ * Var 989: 語言 (1=中文, 2=英文)
+ * Var 990: 年級 (1=中一 … 3=中三)
+ * Var 992: 這一課做到第幾題（答對 +1）。換課題時歸零。
  */
 
 (() => {
@@ -72,6 +80,175 @@
     if (quizMessageLineCount < 1) quizMessageLineCount = 1;
     if (quizMessageLineCount > 4) quizMessageLineCount = 4;
     const tsaLockVariableId = Number(parameters['TsaLockVariableId'] || 988);
+    const topicVariableId = 980;
+
+    function mzqDecodeTopic(code) {
+        code = Number(code) || 0;
+        if (code < 1000) return "";
+        var form = Math.floor(code / 1000);
+        var rest = code % 1000;
+        if (form === 6 && rest < 100) {
+            var senior = String(rest);
+            if (senior.length < 2) senior = "0" + senior;
+            return "6" + senior;
+        }
+        var book = rest >= 100 ? "B" : "A";
+        var chapter = rest % 100;
+        if (form < 1 || form > 6 || chapter < 1 || chapter > 30) return "";
+        var chapterText = String(chapter);
+        if (chapterText.length < 2) chapterText = "0" + chapterText;
+        return String(form) + book + chapterText;
+    }
+
+    function mzqEncodeTopic(chapter) {
+        var book = /^(\d)([AB])(\d{2})$/.exec(chapter || "");
+        if (book) {
+            return Number(book[1]) * 1000 + (book[2] === "B" ? 100 : 0) + Number(book[3]);
+        }
+        var senior = /^6(\d{2})$/.exec(chapter || "");
+        if (senior) return 6000 + Number(senior[1]);
+        return 0;
+    }
+
+    function mzqCurriculum() {
+        return [
+            { no: 1, grade: 1, chapter: "1A01", name: "基礎計算", strands: "A" },
+            { no: 2, grade: 1, chapter: "1A02", name: "有向數", strands: "A" },
+            { no: 3, grade: 1, chapter: "1A03", name: "基礎代數（一）", strands: "A" },
+            { no: 4, grade: 1, chapter: "1A04", name: "基礎代數（二）", strands: "A" },
+            { no: 5, grade: 1, chapter: "1A05", name: "百分法（一）", strands: "A" },
+            { no: 6, grade: 1, chapter: "1A06", name: "基礎幾何", strands: "G" },
+            { no: 7, grade: 1, chapter: "1B07", name: "求積法（一）", strands: "G" },
+            { no: 8, grade: 1, chapter: "1B08", name: "直角坐標系（一）", strands: "G" },
+            { no: 9, grade: 1, chapter: "1B09", name: "角和平行線（一）", strands: "G" },
+            { no: 10, grade: 1, chapter: "1B10", name: "全等及相似（一）", strands: "G" },
+            { no: 11, grade: 1, chapter: "1B11", name: "數值估算", strands: "A" },
+            { no: 12, grade: 1, chapter: "1B12", name: "數據的組織和表達（一）", strands: "D" },
+            { no: 1, grade: 2, chapter: "2A01", name: "近似與誤差", strands: "AG" },
+            { no: 2, grade: 2, chapter: "2A02", name: "多項式的運算及因式分解", strands: "A" },
+            { no: 3, grade: 2, chapter: "2A03", name: "恆等式", strands: "A" },
+            { no: 4, grade: 2, chapter: "2A04", name: "代數分式及公式", strands: "A" },
+            { no: 5, grade: 2, chapter: "2A05", name: "二元一次方程", strands: "A" },
+            { no: 6, grade: 2, chapter: "2A06", name: "角和平行線（二）", strands: "G" },
+            { no: 7, grade: 2, chapter: "2A07", name: "數據的組織和表達（二）", strands: "D" },
+            { no: 8, grade: 2, chapter: "2B08", name: "率、比及比例", strands: "A" },
+            { no: 9, grade: 2, chapter: "2B09", name: "全等及相似（二）", strands: "G" },
+            { no: 10, grade: 2, chapter: "2B10", name: "多邊形", strands: "G" },
+            { no: 11, grade: 2, chapter: "2B11", name: "畢氏定理及無理數", strands: "AG" },
+            { no: 12, grade: 2, chapter: "2B12", name: "認識三角學", strands: "G" },
+            { no: 13, grade: 2, chapter: "2B13", name: "求積法（二）", strands: "G" },
+            { no: 1, grade: 3, chapter: "3A01", name: "續因式分解", strands: "A" },
+            { no: 2, grade: 3, chapter: "3A02", name: "整數指數定律", strands: "A" },
+            { no: 3, grade: 3, chapter: "3A03", name: "百分法（二）", strands: "A" },
+            { no: 4, grade: 3, chapter: "3A04", name: "一元一次不等式", strands: "A" },
+            { no: 5, grade: 3, chapter: "3A05", name: "概率", strands: "D" },
+            { no: 6, grade: 3, chapter: "3A06", name: "集中趨勢的度量", strands: "D" },
+            { no: 7, grade: 3, chapter: "3A07", name: "續三角形", strands: "G" },
+            { no: 8, grade: 3, chapter: "3B08", name: "四邊形", strands: "G" },
+            { no: 9, grade: 3, chapter: "3B09", name: "續立體圖形", strands: "G" },
+            { no: 10, grade: 3, chapter: "3B10", name: "求積法（三）", strands: "G" },
+            { no: 11, grade: 3, chapter: "3B11", name: "三角比的關係", strands: "G" },
+            { no: 12, grade: 3, chapter: "3B12", name: "三角學的應用", strands: "G" },
+            { no: 13, grade: 3, chapter: "3B13", name: "直角坐標系（二）", strands: "G" },
+            { no: 1, grade: 4, chapter: "4A03", name: "一元二次方程", strands: "A" },
+            { no: 2, grade: 4, chapter: "4A02", name: "直線的方程", strands: "AG" },
+            { no: 3, grade: 4, chapter: "4A04", name: "函數和函數的圖像", strands: "AG" },
+            { no: 4, grade: 4, chapter: "4A05", name: "函數圖像", strands: "AG" },
+            { no: 6, grade: 4, chapter: "4B07", name: "指數函數", strands: "A" },
+            { no: 7, grade: 4, chapter: "4B08", name: "對數函數", strands: "A" },
+            { no: 8, grade: 4, chapter: "4B10", name: "三角學（一）", strands: "G" },
+            { no: 9, grade: 4, chapter: "4B09", name: "續方程", strands: "A" },
+            { no: 10, grade: 4, chapter: "4A01", name: "複數", strands: "A" },
+            { no: 11, grade: 4, chapter: "4B11", name: "圓的基本性質（一）", strands: "G" },
+            { no: 12, grade: 4, chapter: "4B12", name: "圓的基本性質（二）", strands: "G" },
+            { no: 10, grade: 5, chapter: "5A02", name: "不等式", strands: "A" },
+            { no: 14, grade: 5, chapter: "5A01", name: "三角學（二）", strands: "G" },
+            { no: 7, grade: 5, chapter: "5A04", name: "變分", strands: "A" },
+            { no: 13, grade: 5, chapter: "5B11", name: "離差的度量", strands: "D" },
+            { no: 15, grade: 5, chapter: "5B08", name: "圓的方程", strands: "AG" },
+            { no: 16, grade: 5, chapter: "5B07", name: "軌跡", strands: "G" },
+            { no: 17, grade: 5, chapter: "5A05", name: "排列與組合", strands: "D" },
+            { no: 18, grade: 5, chapter: "5A06", name: "續概率", strands: "D" },
+            { no: 19, grade: 6, chapter: "603", name: "線性規劃", strands: "AG" },
+            { no: 20, grade: 6, chapter: "601", name: "等差數列和等比數列", strands: "A" },
+            { no: 21, grade: 6, chapter: "602", name: "等差數列及等比數列的求和法", strands: "A" },
+            { no: 23, grade: 6, chapter: "604", name: "統計的應用及誤用", strands: "D" }
+        ];
+    }
+
+    function mzqStrandName(strand) {
+        if (strand === "G") return "圖形與空間";
+        if (strand === "D") return "數據處理";
+        return "數與代數";
+    }
+
+    function mzqLessonInfo(chapter) {
+        var list = mzqCurriculum();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].chapter === chapter) return list[i];
+        }
+        return null;
+    }
+
+    function mzqRowsForChapter(chapter) {
+        var ch = null;
+        var en = null;
+        (window.MZQ_TOPICS || []).forEach(function(topic) {
+            if (topic.chapter !== chapter) return;
+            if (topic.lang === "EN") en = topic;
+            else ch = topic;
+        });
+        return { ch: ch, en: en };
+    }
+
+    function mzqPlayableLessons(grade, strand) {
+        return mzqCurriculum().filter(function(lesson) {
+            if (Number(lesson.grade) !== Number(grade)) return false;
+            if (lesson.strands.indexOf(strand) < 0) return false;
+            var rows = mzqRowsForChapter(lesson.chapter);
+            return !!(rows.ch || rows.en);
+        });
+    }
+
+    function mzqLangIsEnglish() {
+        return Number($gameVariables.value(989)) === 2;
+    }
+
+    function mzqTopicsFor(grade, lang) {
+        var list = window.MZQ_TOPICS || [];
+        var langKey = Number(lang) === 2 ? "EN" : "CH";
+        return list.filter(function(topic) {
+            return Number(topic.grade) === Number(grade) && topic.lang === langKey;
+        });
+    }
+
+    function mzqGrades() {
+        return [1, 2, 3, 4, 5, 6];
+    }
+
+    function mzqGradeName(grade) {
+        var names = { 1: "中一", 2: "中二", 3: "中三", 4: "中四", 5: "中五", 6: "中六" };
+        return names[grade] || ("年級 " + grade);
+    }
+
+    window.MZQ_questionList = function() {
+        if (!window.questionDatabase) return null;
+        var chapter = mzqDecodeTopic($gameVariables.value(topicVariableId));
+        if (!chapter) return null;
+        var key = chapter + "_" + (mzqLangIsEnglish() ? "EN" : "CH");
+        var list = window.questionDatabase[key];
+        return list && list.length ? list : null;
+    };
+
+    window.MZQ_topicLabel = function() {
+        var chapter = mzqDecodeTopic($gameVariables.value(topicVariableId));
+        if (!chapter) return "還沒選擇";
+        var info = mzqLessonInfo(chapter);
+        var grade = mzqGradeName(Number($gameVariables.value(990)));
+        var lang = mzqLangIsEnglish() ? "英文" : "中文";
+        var name = info ? (info.no + " " + info.name) : chapter;
+        return grade + " " + name + " " + lang;
+    };
 
     let _mzqExpireFrame = 0;
     let _mzqPending = null;
@@ -107,9 +284,40 @@
         }
     };
 
+    const _MZQ_updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
+    Game_Interpreter.prototype.updateWaitMode = function() {
+        if (this._waitMode === "mzqTopic") {
+            var scene = SceneManager._scene;
+            if (SceneManager.isSceneChanging() || (scene && scene instanceof Scene_MzqTopic)) {
+                return true;
+            }
+            this._waitMode = "";
+            if (this._mzqAskAfterTopic) {
+                this._mzqAskAfterTopic = false;
+                this.getQuestion();
+                this.setWaitMode("message");
+                return true;
+            }
+            return false;
+        }
+        return _MZQ_updateWaitMode.call(this);
+    };
+
+    PluginManager.registerCommand(pluginName, "chooseTopic", function() {
+        $gameTemp._mzqForceTopic = true;
+        SceneManager.push(Scene_MzqTopic);
+    });
+
     PluginManager.registerCommand(pluginName, "getQuestion", function() {
+        if (!window.MZQ_questionList || !window.MZQ_questionList()) {
+            this._mzqAskAfterTopic = true;
+            $gameTemp._mzqForceTopic = true;
+            SceneManager.push(Scene_MzqTopic);
+            this.setWaitMode("mzqTopic");
+            return;
+        }
         this.getQuestion();
-        this.setWaitMode('message');
+        this.setWaitMode("message");
     });
 
     Game_Interpreter.prototype.getQuestion = function() {
@@ -117,72 +325,19 @@
         $gameSwitches.setValue(991, false);
         $gameSwitches.setValue(992, false);
 
-        // --- 1. 確定分類 (Difficulty & Language) ---
-        var diff = $gameVariables.value(990);
-        var lang = $gameVariables.value(989);
+        var questionList = (typeof window.MZQ_questionList === "function") ? window.MZQ_questionList() : null;
+        var folderPrefix = "";
 
-        if (!diff || diff === 0) { diff = 1; }
-        if (!lang || lang === 0) { lang = 1; }
-
-        var categoryKey = "Questions"; 
-        var folderPrefix = ""; 
-
-        if (diff === 4) {
-            categoryKey = "TSA_ALL";
-            folderPrefix = "初中題庫/TSA/";
-        } else {
-            var diffStr = "";
-            var folderDiff = "";
-            if (diff === 1) { diffStr = "S1"; folderDiff = "S1 AI 生成題目"; }
-            else if (diff === 2) { diffStr = "S2"; folderDiff = "S2 AI生成題目"; }
-            else if (diff === 3) { diffStr = "S3"; folderDiff = "S3 AI生成題目"; }
-            
-            var langStr = "";
-            var folderLang = "";
-            if (lang === 1) { langStr = "CH"; folderLang = "中文題目"; }
-            else if (lang === 2) { langStr = "EN"; folderLang = "英文題目"; }
-
-            if (diffStr !== "" && langStr !== "") {
-                categoryKey = diffStr + "_" + langStr;
-                folderPrefix = "初中題庫/" + folderDiff + "/" + folderLang + "/";
-            } else {
-                 if (diff === 1) { categoryKey = "S1MCQ"; folderPrefix = "S1MCQ/"; }
-                 else if (diff === 2) { categoryKey = "S2MCQ"; folderPrefix = "S2MCQ/"; }
-            }
+        if (!questionList || !questionList.length) {
+            $gameSwitches.setValue(992, true);
+            $gameMessage.add("這個課題還沒有題目。請打開選單，按「選擇課題」。");
+            return;
         }
 
-        var questionList = questionDatabase[categoryKey];
-
-        if (!questionList) {
-            if (questionDatabase["Questions"]) {
-                questionList = questionDatabase["Questions"];
-                folderPrefix = "";
-            } else {
-                $gameMessage.add("Error: No questions found for " + categoryKey);
-                return;
-            }
-        }
-
-        // --- 2. 獲取題號 ---
-        var qIndex;
-        if (diff === 4) {
-            var lockRaw = $gameVariables.value(tsaLockVariableId);
-            if (lockRaw > 0) {
-                qIndex = lockRaw - 1;
-                if (qIndex < 0 || qIndex >= questionList.length) {
-                    qIndex = Math.floor(Math.random() * questionList.length);
-                    $gameVariables.setValue(tsaLockVariableId, qIndex + 1);
-                }
-            } else {
-                qIndex = Math.floor(Math.random() * questionList.length);
-                $gameVariables.setValue(tsaLockVariableId, qIndex + 1);
-            }
-        } else {
-            qIndex = $gameVariables.value(992);
-            if (qIndex >= questionList.length) {
-                $gameMessage.add("（所有題目已完成）");
-                return;
-            }
+        var qIndex = $gameVariables.value(992);
+        if (qIndex < 0 || qIndex >= questionList.length) {
+            qIndex = 0;
+            $gameVariables.setValue(992, 0);
         }
 
         var question = questionList[qIndex];
@@ -332,13 +487,8 @@
         // --- 修正：更全面地解除懲罰狀態 ---
         updatePenaltyState(false); // false = remove
 
-        // 變量 992 加 1（TSA 隨機操練不加，避免誤觸「題庫用盡」邏輯）
-        if ($gameVariables.value(990) !== 4) {
-            var currentQ = $gameVariables.value(992);
-            $gameVariables.setValue(992, currentQ + 1);
-        } else {
-            $gameVariables.setValue(tsaLockVariableId, 0);
-        }
+        var currentQ = $gameVariables.value(992);
+        $gameVariables.setValue(992, currentQ + 1);
 
         $gameVariables.setValue(993, $gameVariables.value(993) + 1); 
         $gameVariables.setValue(996, $gameVariables.value(996) + 1); 
@@ -431,5 +581,194 @@
     Sprite_Timer.prototype.updatePosition = function() {
         this.x = (Graphics.width - this.bitmap.width) / 2;
         this.y = 584; 
+    };
+
+    function Scene_MzqTopic() {
+        this.initialize.apply(this, arguments);
+    }
+
+    Scene_MzqTopic.prototype = Object.create(Scene_MenuBase.prototype);
+    Scene_MzqTopic.prototype.constructor = Scene_MzqTopic;
+
+    Scene_MzqTopic.prototype.initialize = function() {
+        Scene_MenuBase.prototype.initialize.call(this);
+        this._grade = Number($gameVariables.value(990)) || 1;
+        if (this._grade < 1 || this._grade > 6) this._grade = 1;
+        this._lang = Number($gameVariables.value(989)) === 2 ? 2 : 1;
+        this._strand = "A";
+        this._lesson = null;
+        this._step = "grade";
+    };
+
+    Scene_MzqTopic.prototype.create = function() {
+        Scene_MenuBase.prototype.create.call(this);
+        this.createHelpWindow();
+        var rect = new Rectangle(40, 160, Graphics.boxWidth - 80, this.calcWindowHeight(8, true));
+        this._pickWindow = new Window_MzqPick(rect);
+        this._pickWindow.setHandler("pick", this.onPick.bind(this));
+        this._pickWindow.setHandler("cancel", this.onCancel.bind(this));
+        this.addWindow(this._pickWindow);
+        this.refreshStep();
+    };
+
+    Scene_MzqTopic.prototype.createHelpWindow = function() {
+        this._helpWindow = new Window_Help(new Rectangle(0, 0, Graphics.boxWidth, this.calcWindowHeight(2, false)));
+        this.addWindow(this._helpWindow);
+    };
+
+    Scene_MzqTopic.prototype.helpText = function() {
+        if (this._step === "grade") {
+            return "請選擇年級。選好課題之後，遊戲才會開始。\\n按取消可以回到上一個畫面。";
+        }
+        if (this._step === "strand") {
+            return mzqGradeName(this._grade) + "：課題先分三個範圍。請選一個。\\n按取消可以改年級。";
+        }
+        if (this._step === "lang") {
+            var lessonName = this._lesson ? this._lesson.name : "";
+            return lessonName + " 有中文和英文。要做哪一種？\\n按取消可以改課題。";
+        }
+        return mzqGradeName(this._grade) + " " + mzqStrandName(this._strand) + "：請選擇課題。\\n選好後從第 1 題開始。按取消可以改範圍。";
+    };
+
+    Scene_MzqTopic.prototype.refreshStep = function() {
+        this._helpWindow.setText(this.helpText());
+        this._pickWindow.refresh();
+        var index = 0;
+        if (this._step === "grade") index = Math.max(0, this._grade - 1);
+        this._pickWindow.select(index);
+        this._pickWindow.activate();
+    };
+
+    Scene_MzqTopic.prototype.finishLesson = function(lesson, lang) {
+        $gameVariables.setValue(topicVariableId, mzqEncodeTopic(lesson.chapter));
+        $gameVariables.setValue(990, lesson.grade);
+        $gameVariables.setValue(989, lang);
+        $gameVariables.setValue(992, 0);
+        $gameTemp._mzqForceTopic = false;
+        this.popScene();
+    };
+
+    Scene_MzqTopic.prototype.onPick = function() {
+        var picked = this._pickWindow.currentExt();
+        if (this._step === "grade") {
+            this._grade = picked;
+            this._step = "strand";
+            this.refreshStep();
+            return;
+        }
+        if (this._step === "strand") {
+            this._strand = picked;
+            if (!mzqPlayableLessons(this._grade, picked).length) {
+                SoundManager.playBuzzer();
+                this._helpWindow.setText(mzqGradeName(this._grade) + "的" + mzqStrandName(picked) + "，題目圖片還沒有放進遊戲。\\n請改選其他範圍，或按取消改年級。");
+                this._pickWindow.activate();
+                return;
+            }
+            this._step = "topic";
+            this.refreshStep();
+            return;
+        }
+        if (this._step === "lang") {
+            this.finishLesson(this._lesson, picked);
+            return;
+        }
+        var rows = mzqRowsForChapter(picked.chapter);
+        this._lesson = picked;
+        if (rows.ch && rows.en) {
+            this._step = "lang";
+            this.refreshStep();
+            return;
+        }
+        this.finishLesson(picked, rows.ch ? 1 : 2);
+    };
+
+    Scene_MzqTopic.prototype.onCancel = function() {
+        if (this._step === "lang") {
+            this._step = "topic";
+            this.refreshStep();
+            return;
+        }
+        if (this._step === "topic") {
+            this._step = "strand";
+            this.refreshStep();
+            return;
+        }
+        if (this._step === "strand") {
+            this._step = "grade";
+            this.refreshStep();
+            return;
+        }
+        if ($gameTemp._mzqForceTopic) {
+            SoundManager.playBuzzer();
+            this._pickWindow.activate();
+            return;
+        }
+        this.popScene();
+    };
+
+    function Window_MzqPick() {
+        this.initialize.apply(this, arguments);
+    }
+
+    Window_MzqPick.prototype = Object.create(Window_Command.prototype);
+    Window_MzqPick.prototype.constructor = Window_MzqPick;
+
+    Window_MzqPick.prototype.initialize = function(rect) {
+        Window_Command.prototype.initialize.call(this, rect);
+    };
+
+    Window_MzqPick.prototype.numVisibleRows = function() {
+        return 8;
+    };
+
+    Window_MzqPick.prototype.makeCommandList = function() {
+        var scene = SceneManager._scene;
+        if (!scene || scene.constructor !== Scene_MzqTopic) return;
+        if (scene._step === "grade") {
+            mzqGrades().forEach(function(grade) {
+                this.addCommand(mzqGradeName(grade), "pick", true, grade);
+            }, this);
+            return;
+        }
+        if (scene._step === "strand") {
+            this.addCommand("數與代數", "pick", true, "A");
+            this.addCommand("圖形與空間", "pick", true, "G");
+            this.addCommand("數據處理", "pick", true, "D");
+            return;
+        }
+        if (scene._step === "lang") {
+            this.addCommand("中文題目", "pick", true, 1);
+            this.addCommand("英文題目", "pick", true, 2);
+            return;
+        }
+        var lessons = mzqPlayableLessons(scene._grade, scene._strand);
+        if (!lessons.length) {
+            this.addCommand("這個範圍還沒有題目", "pick", false, null);
+            return;
+        }
+        lessons.forEach(function(lesson) {
+            var rows = mzqRowsForChapter(lesson.chapter);
+            var bits = [];
+            if (rows.ch) bits.push("中文" + rows.ch.count + "題");
+            if (rows.en) bits.push("英文" + rows.en.count + "題");
+            this.addCommand(lesson.no + " " + lesson.name + "    " + bits.join("／"), "pick", true, lesson);
+        }, this);
+    };
+
+    const _Window_MenuCommand_addOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
+    Window_MenuCommand.prototype.addOriginalCommands = function() {
+        _Window_MenuCommand_addOriginalCommands.call(this);
+        this.addCommand("選擇課題", "mzqTopic", true);
+    };
+
+    const _Scene_Menu_createCommandWindow = Scene_Menu.prototype.createCommandWindow;
+    Scene_Menu.prototype.createCommandWindow = function() {
+        _Scene_Menu_createCommandWindow.call(this);
+        this._commandWindow.setHandler("mzqTopic", this.mzqOpenTopic.bind(this));
+    };
+
+    Scene_Menu.prototype.mzqOpenTopic = function() {
+        $gameTemp._mzqForceTopic = false;
+        SceneManager.push(Scene_MzqTopic);
     };
 })();
