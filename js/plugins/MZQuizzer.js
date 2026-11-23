@@ -3,7 +3,7 @@
 //=============================================================================
 /*:
  * @target MZ
- * @plugindesc [v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡；題圖縮到畫面內）
+ * @plugindesc [v1.6.1] Quiz Engine（自選課題；題圖縮到畫面內；計時不蓋題）
  * @author Starbird (Modified by Senior Programmer)
  *
  * @command getQuestion
@@ -40,6 +40,8 @@
  * @default 988
  *
  * @help 
+ * [v1.6.1] 答題時「剩餘時間」改到畫面下方的訊息列右側，不再蓋住長題或右邊的圖。
+ *
  * [v1.5.0] 開場先選年級，再選範圍（數與代數、圖形與空間、數據處理），然後選課題。選好遊戲才開始。
  *         選單有「選擇課題」。換課題會從第 1 題再開始。舊存檔若沒選課題，第一場戰鬥會先叫你選。
  *
@@ -295,6 +297,33 @@
         pic._targetScaleX = layout.scalePercent;
         pic._targetScaleY = layout.scalePercent;
         pic._duration = 0;
+    }
+
+    function syncQuizTimer(scene) {
+        if (!scene || !scene._timeWindow || typeof QuizPictureFit === "undefined") return;
+        var win = scene._timeWindow;
+        if (!win._mzqHome) {
+            win._mzqHome = { x: win.x, y: win.y };
+        }
+        if (quizPictureOnScreen()) {
+            var msg = scene._messageWindow;
+            var messageOpen = !!(msg && msg.isOpen() && msg.height > 0);
+            var slot = QuizPictureFit.timerSlot(
+                Graphics.boxWidth,
+                Graphics.boxHeight,
+                win.width,
+                win.height,
+                messageOpen ? msg.y : 0,
+                messageOpen ? msg.height : 0
+            );
+            win.x = slot.x;
+            win.y = slot.y;
+            win._mzqParked = true;
+        } else if (win._mzqParked) {
+            win.x = win._mzqHome.x;
+            win.y = win._mzqHome.y;
+            win._mzqParked = false;
+        }
     }
 
     const _Window_Message_startMessage = Window_Message.prototype.startMessage;
@@ -679,12 +708,14 @@
     const _Scene_Battle_update_MZQ = Scene_Battle.prototype.update;
     Scene_Battle.prototype.update = function() {
         _Scene_Battle_update_MZQ.call(this);
+        syncQuizTimer(this);
         tryMzqQuestionTimeout(this);
     };
 
     const _Scene_Map_update_MZQ = Scene_Map.prototype.update;
     Scene_Map.prototype.update = function() {
         _Scene_Map_update_MZQ.call(this);
+        syncQuizTimer(this);
         tryMzqQuestionTimeout(this);
     };
 

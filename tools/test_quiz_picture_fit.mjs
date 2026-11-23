@@ -48,4 +48,39 @@ const letterReserve = QuizPictureFit.bottomReserve(4, true);
 const longReserve = QuizPictureFit.bottomReserve(4, false);
 assert.ok(letterReserve < longReserve, "one-row answers leave more room for the picture");
 
+const tablet = { w: 1272, h: 712 };
+const messageH = 68;
+const messageY = tablet.h - messageH;
+const timer = QuizPictureFit.timerSlot(tablet.w, tablet.h, 250, 60, messageY, messageH);
+
+function pictureRect(imgW, imgH) {
+    const reserve = QuizPictureFit.bottomReserve(4, true);
+    const layout = QuizPictureFit.layout(imgW, imgH, tablet.w, tablet.h, reserve);
+    return { x: layout.x, y: layout.y, w: layout.drawW, h: layout.drawH, layout: layout };
+}
+
+const samples = [
+    ["short card", 480, 180],
+    ["wide photo", 2339, 1001],
+    ["tall photo", 2277, 1063],
+    ["long stem card", 867, 360],
+    ["figure on the right", 883, 224]
+];
+for (const sample of samples) {
+    const rect = pictureRect(sample[1], sample[2]);
+    assert.equal(
+        QuizPictureFit.rectsOverlap(rect, timer),
+        false,
+        sample[0] + " must not sit under the timer"
+    );
+    assert.ok(timer.y >= rect.y + rect.h - 0.5, sample[0] + " timer stays below the picture");
+    assert.ok(timer.x >= 0 && timer.y >= 0, sample[0] + " timer stays on screen");
+    assert.ok(timer.x + timer.w <= tablet.w + 0.5, sample[0] + " timer right edge");
+    assert.ok(timer.y + timer.h <= tablet.h + 0.5, sample[0] + " timer bottom edge");
+}
+
+const parkedLow = QuizPictureFit.timerSlot(tablet.w, tablet.h, 250, 60, 0, 0);
+const wideRect = pictureRect(2339, 1001);
+assert.equal(QuizPictureFit.rectsOverlap(wideRect, parkedLow), false, "timer at the bottom still clears the picture");
+
 console.log("quiz picture fit ok");
