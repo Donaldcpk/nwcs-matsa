@@ -14,6 +14,7 @@ const scriptUrls = [
     "js/rmmz_scenes.js",
     "js/rmmz_sprites.js",
     "js/rmmz_windows.js",
+    "js/nwcs-ai-help.js",
     "js/plugins.js"
 ];
 const effekseerWasmUrl = "js/libs/effekseer.wasm";

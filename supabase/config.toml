@@ -1,0 +1,4 @@
+# 遊戲沒有登入。若要求 JWT，瀏覽器就得再帶一把公開金鑰。
+# 這個函式自己檢查來源網址，模型金鑰只留在伺服器。
+[functions.game-proxy]
+verify_jwt = false
