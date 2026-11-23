@@ -93,12 +93,12 @@
  * @default 現在是休息時間，請明天再來！
  *
  * @param ---通用與安全---
- * * @param UnlockPassword
+ * * @param proxyUrl
  * @parent ---通用與安全---
- * @text 解鎖密碼
- * @desc 輸入此密碼可無視限制繼續遊玩。
+ * @text 解鎖伺服器網址
+ * @desc 密碼不要寫在遊戲裡。伺服器環境變數 TIME_UNLOCK_PASSWORD 才是解鎖密碼。
  * @type string
- * @default 23838077
+ * @default https://oqsvxizemgyfointylpe.supabase.co/functions/v1/game-proxy
  *
  * @param ForceSave
  * @parent ---通用與安全---
@@ -159,8 +159,7 @@ var Kurimanju = Kurimanju || {};
     const curfewEnd = Number(parameters['CurfewEnd'] || 6);
     const curfewMsg = parameters['CurfewMessage'] || "現在是休息時間，請明天再來！";
 
-    const adminPassword = parameters['UnlockPassword'] || "23838077";
-    const forceSave = (parameters['ForceSave'] || 'true') === 'true';
+        const forceSave = (parameters['ForceSave'] || 'true') === 'true';
     const warningMinutes = Number(parameters['WarningMinutes'] || 10);
     const warningMsg = parameters['WarningMessage'];
     
@@ -272,17 +271,33 @@ var Kurimanju = Kurimanju || {};
             try { $gameSystem.onBeforeSave(); DataManager.saveGame(1); } catch (e) {}
         }
         const input = window.prompt(message + "\n\n(管理員請輸入密碼解鎖)", "");
-        if (input === adminPassword) {
-            window.alert("密碼正確！已解除所有時間限制。");
-            isAdminMode = true;
-            isLockingDown = false;
-            if (SceneManager._scene) {
-                SceneManager._scene._active = true;
-            }
-            updateTimeSystem(true);
+        if (!input) {
+            SceneManager.exit();
             return;
         }
-        SceneManager.exit();
+        const help = window.NwcsAiHelp;
+        if (!help || !help.verifyTimeUnlock) {
+            window.alert("現在連不到解鎖伺服器。");
+            SceneManager.exit();
+            return;
+        }
+        help.verifyTimeUnlock(input).then(function (result) {
+            if (result && result.ok) {
+                window.alert("密碼正確！已解除所有時間限制。");
+                isAdminMode = true;
+                isLockingDown = false;
+                if (SceneManager._scene) {
+                    SceneManager._scene._active = true;
+                }
+                updateTimeSystem(true);
+                return;
+            }
+            window.alert((result && result.error) || "密碼不對。");
+            SceneManager.exit();
+        }).catch(function () {
+            window.alert("現在連不到解鎖伺服器。");
+            SceneManager.exit();
+        });
     }
 
     // ========================================================================

@@ -8,15 +8,10 @@
  * 在道具/武器/防具/敵人的備註欄中輸入：
  * <Score: 50>  (將 50 替換為你想給予的積分，預設為 10)
  *
- * 【排行榜／Supabase】
- * 網頁版登入後（school-auth-gate）會以 Supabase Auth 的 user id 作為 player_id，
- * 與換電腦無關；未登入時仍用存檔內隨機 UUID。
- * 請在資料表 global_leaderboard 設 player_id (text, UNIQUE)，POST 使用
- * ?on_conflict=player_id。建議執行 tools/supabase_student_whitelist_and_rls.sql：
- * 名冊表 student_whitelist、登入觸發器、以及 JWT 寫入 registered_email／earth_ref（地球身分參照）。
- * 除錯：上傳／讀取失敗時請開 F12 主控台，會印出 HTTP 狀態與錯誤本文（常見為 401
- * 金鑰錯誤、404 表名錯誤、RLS 擋下寫入）。Supabase 儀表板請使用與 PostgREST 相容的
- * anon（JWT）或專案提供的 publishable key；若 401 請在專案 Settings → API 核對。
+ * 【排行榜】
+ * 網頁版不登入。分數經由 proxyUrl 轉送，瀏覽器不保存資料庫金鑰。
+ * 已登入的舊存檔若還有工作階段，會一併送出，方便寫入自己的那一列。
+ * 請在資料表 global_leaderboard 設 player_id (text, UNIQUE)。
  *
  * @param scoreVariableId
  * @text 積分綁定變數 ID
@@ -24,15 +19,11 @@
  * @type variable
  * @default 10
  *
- * @param supabaseUrl
- * @text Supabase 專案 URL
- * @desc 你的 Supabase API 網址 (例如: https://oqsvxizemgyfointylpe.supabase.co)
+ * @param proxyUrl
+ * @text 排行榜伺服器網址
+ * @desc 只填代理網址，不要填資料庫金鑰。
  * @type string
- *
- * @param supabaseKey
- * @text Supabase Anon Key
- * @desc 你的 Supabase 公開 API 密鑰 (sb_publishable_...)
- * @type string
+ * @default https://oqsvxizemgyfointylpe.supabase.co/functions/v1/game-proxy
  */
 
 (() => {
@@ -357,78 +348,36 @@ class NetworkManager {
     static async uploadScore() {
         NetworkManager.ensureLeaderboardPlayerId();
         await this.refreshUserSessionIfNeeded();
-        const base = this.getBaseUrl();
-        const url = `${base}/rest/v1/global_leaderboard?on_conflict=player_id`;
-        const key = this.getKey();
-        const bearer = this.getBearerForRest();
-        if (!key || !base) {
-            console.error('[OmniscientEncyclopedia] Supabase：未設定 supabaseUrl 或 supabaseKey');
+        if (!window.NwcsAiHelp) {
+            console.error('[OmniscientEncyclopedia] 找不到排行榜代理');
             return false;
         }
-
-        const payload = this.generatePlayerPayload();
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': key,
-                    'Authorization': `Bearer ${bearer}`,
-                    'Prefer': 'resolution=merge-duplicates' 
-                },
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) {
-                const body = await response.text();
-                console.error(
-                    '[OmniscientEncyclopedia] 上傳失敗 HTTP',
-                    response.status,
-                    response.statusText,
-                    body ? body.slice(0, 500) : ''
-                );
-                return false;
-            }
-            return true;
-        } catch (error) {
-            console.error('[OmniscientEncyclopedia] Supabase 連線錯誤:', error);
+        const result = await window.NwcsAiHelp.postProxy({
+            action: 'leaderboard-write',
+            row: this.generatePlayerPayload(),
+            accessToken: window.__sbAccessToken || ''
+        });
+        if (!result.ok) {
+            console.error('[OmniscientEncyclopedia] 上傳失敗', result.error || '');
             return false;
         }
+        return true;
     }
 
     static async fetchTop50(orderBy) {
         await this.refreshUserSessionIfNeeded();
-        const base = this.getBaseUrl();
-        const since = encodeURIComponent(RANKING_SEASON_START);
-        const url =
-            `${base}/rest/v1/global_leaderboard?select=*&updated_at=gte.${since}` +
-            `&order=${orderBy}.desc&limit=50`;
-        const key = this.getKey();
-        const bearer = this.getBearerForRest();
-
-        try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'apikey': key,
-                    'Authorization': `Bearer ${bearer}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (!response.ok) {
-                const body = await response.text();
-                console.error(
-                    '[OmniscientEncyclopedia] 讀取排行榜失敗 HTTP',
-                    response.status,
-                    body ? body.slice(0, 500) : ''
-                );
-                return [];
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('[OmniscientEncyclopedia] Supabase 讀取錯誤:', error);
+        if (!window.NwcsAiHelp) return [];
+        const result = await window.NwcsAiHelp.postProxy({
+            action: 'leaderboard-read',
+            orderBy: orderBy,
+            since: RANKING_SEASON_START,
+            accessToken: window.__sbAccessToken || ''
+        });
+        if (!result.ok) {
+            console.error('[OmniscientEncyclopedia] 讀取排行榜失敗', result.error || '');
             return [];
         }
+        return Array.isArray(result.rows) ? result.rows : [];
     }
 }
 

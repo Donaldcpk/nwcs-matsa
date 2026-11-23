@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 戰鬥中的小精靈可以再回答題目。先前寫在網頁裡的 Google 金鑰已被停用，所以每次發問都會失敗。題目圖片也改讀現在題庫的路徑。
+
+### Security
+
+- 拿掉公開頁面上的 Google 金鑰、Supabase 前端金鑰，以及每日限時解鎖密碼。新的金鑰和密碼只放在伺服器。設定步驟見 [docs/ai-proxy-setup.md](docs/ai-proxy-setup.md)。
 
 ### Added
 
