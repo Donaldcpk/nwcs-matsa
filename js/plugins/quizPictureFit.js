@@ -78,6 +78,27 @@ var QuizPictureFit = QuizPictureFit || {};
             maxH: maxH
         };
     };
+
+    // 答題時把「剩餘時間」放到訊息列右側，避免蓋住題幹或附圖。
+    // messageH 為 0 時，改放在畫面最底，仍留在題圖預留區裡。
+    QuizPictureFit.timerSlot = function(boxW, boxH, timerW, timerH, messageY, messageH) {
+        var width = Math.max(1, timerW);
+        var height = Math.max(1, timerH);
+        var x = Math.max(0, boxW - width - MARGIN);
+        var y;
+        if (messageH > 0) {
+            y = messageY + Math.round((messageH - height) / 2);
+        } else {
+            y = boxH - height - MARGIN;
+        }
+        if (y < 0) y = 0;
+        if (y + height > boxH) y = Math.max(0, boxH - height);
+        return { x: x, y: y, w: width, h: height };
+    };
+
+    QuizPictureFit.rectsOverlap = function(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    };
 })();
 
 if (typeof module !== "undefined" && module.exports) {

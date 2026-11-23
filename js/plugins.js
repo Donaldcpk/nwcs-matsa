@@ -4,7 +4,7 @@ var $plugins =
 [
 {"name":"TorigoyaMZ_EnemyHpBar","status":true,"description":"敵にHPバーを表示プラグイン (v.1.3.2)","parameters":{"base":"","basePosition":"top","basePosX":"0","basePosY":"0","customize":"","customizeCondition":"always","customizeGaugeWidth":"100","customizeGaugeHeight":"10","customizeDrawLabel":"true","customizeLabelWidth":"15","customizeLabelFontSize":"15","customizeValueFontSize":"15","customizeMaskHpValue":"?????"}},
 {"name":"quizPictureFit","status":true,"description":"計算題目圖片縮放，避免字被畫面切掉","parameters":{}},
-{"name":"MZQuizzer","status":true,"description":"[v1.6.0] Quiz Engine（自選課題；沒有原圖的題用 LaTeX 題卡）","parameters":{"penaltyStateId":"300","quizPromptSubstring":"請看題目圖片","quizMessageLineCount":"2","TsaLockVariableId":"988"}},
+{"name":"MZQuizzer","status":true,"description":"[v1.6.1] Quiz Engine（自選課題；題圖縮到畫面內；計時不蓋題）","parameters":{"penaltyStateId":"300","quizPromptSubstring":"請看題目圖片","quizMessageLineCount":"2","TsaLockVariableId":"988"}},
 {"name":"TowerShopTiers","status":true,"description":"[v1.0] Map65 商店進階／隱藏破爛與分類列","parameters":{"towerMapId":"65","levelThreshold":"50","priceMultiplier":"1.75"}},
 {"name":"TowerFloorDisplayName","status":true,"description":"Map65 顯示無限之塔第N層","parameters":{"mapId":"65","floorVariableId":"202"}},
 {"name":"KidTowerGuide","status":true,"description":"大廳與塔內：大字和箭頭，先拿寶箱、走右邊的門、打機械人","parameters":{}},
