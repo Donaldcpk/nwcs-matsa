@@ -183,10 +183,15 @@ def figure_index():
     for dirpath, _, files in os.walk(BANK):
         if "-IMAGE" not in os.path.basename(dirpath):
             continue
-        chapter_match = re.search(r"(\d)([AB])(\d{2})", os.path.basename(dirpath))
-        if not chapter_match:
+        base = os.path.basename(dirpath)
+        chapter_match = re.search(r"(\d)([AB])(\d{2})", base)
+        senior_match = re.search(r"(?:^|-)(6\d{2})(?:-|$)", base)
+        if chapter_match:
+            chapter = f"{chapter_match.group(1)}{chapter_match.group(2).upper()}{chapter_match.group(3)}"
+        elif senior_match:
+            chapter = senior_match.group(1)
+        else:
             continue
-        chapter = f"{chapter_match.group(1)}{chapter_match.group(2).upper()}{chapter_match.group(3)}"
         for name in files:
             num = re.search(r"Q0*(\d+)", name, re.I)
             if not num:
@@ -328,17 +333,47 @@ def layout_rich(draw, text, font, width, size):
     def add_text(value):
         nonlocal x
         value = latex_to_text(value) if "\\" in value else value
-        for char in value:
-            if char == "\n":
+        i = 0
+        n = len(value)
+        while i < n:
+            ch = value[i]
+            if ch == "\n":
                 newline()
+                i += 1
                 continue
-            if char == " " and x == 0:
+            # Keep Latin words together so English stems do not wrap mid-word.
+            if ch.isascii() and (ch.isalnum() or ch in "'’"):
+                j = i + 1
+                while j < n and value[j].isascii() and (value[j].isalnum() or value[j] in "'’"):
+                    j += 1
+                word = value[i:j]
+                adv = draw.textlength(word, font=font)
+                if x and x + adv > width:
+                    newline()
+                if adv > width:
+                    for c in word:
+                        a = draw.textlength(c, font=font)
+                        if x and x + a > width:
+                            newline()
+                        lines[-1].append(("c", c, a))
+                        x += a
+                else:
+                    lines[-1].append(("c", word, adv))
+                    x += adv
+                i = j
                 continue
-            advance = draw.textlength(char, font=font)
+            if ch == " " and x == 0:
+                i += 1
+                continue
+            advance = draw.textlength(ch, font=font)
             if x and x + advance > width:
                 newline()
-            lines[-1].append(("c", char, advance))
+                if ch == " ":
+                    i += 1
+                    continue
+            lines[-1].append(("c", ch, advance))
             x += advance
+            i += 1
 
     def add_math(value, math_size, display):
         nonlocal x
