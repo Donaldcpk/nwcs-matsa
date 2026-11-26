@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Re-render existing TEXT topic cards so newly indexed figures are pasted in.
+"""Re-render existing TEXT topic cards with current typography and figures.
 
-Does not rewrite questionDatabase.js. Skips photo-topic cards and questions
-that still have no figure file.
+Does not rewrite questionDatabase.js. Only overwrites TEXT dest PNGs that
+already exist. Cards without a figure file are still re-rendered as text-only.
 """
 import os
 import sys
@@ -67,12 +67,10 @@ def main():
                 else:
                     skipped_no_dest_no_fig += 1
                 continue
-            if not figure:
-                if mentions_figure(text):
-                    no_fig += 1
-                    still_missing.setdefault(topic, 0)
-                    still_missing[topic] += 1
-                continue
+            if not figure and mentions_figure(text):
+                no_fig += 1
+                still_missing.setdefault(topic, 0)
+                still_missing[topic] += 1
             r.render_card(text, options, figure, dest)
             refreshed += 1
             by_topic[topic] = by_topic.get(topic, 0) + 1

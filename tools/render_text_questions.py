@@ -35,11 +35,15 @@ FONT_PATH = "/System/Library/Fonts/Hiragino Sans GB.ttc"
 CARD_W = 980
 MAX_H = 360
 MARGIN = 16
-Q_FONT = 22
-A_FONT = 20
-Q_MATH = 18
-A_MATH = 16
-MATH_DPI = 110
+Q_FONT = 11
+A_FONT = 10
+Q_MATH = 9
+A_MATH = 8
+MATH_DPI = 440
+MATH_DISPLAY_SCALE = 110 / 440  # high-DPI render, then shrink to half-size target
+FIG_MAX = (440, 320)
+FIG_GAP = 16
+FIG_RIGHT = 10
 BG = (255, 252, 245)
 INK = (28, 32, 38)
 MUTED = (90, 96, 110)
@@ -296,12 +300,16 @@ def math_image(expr, size):
         box = image.getbbox()
         if box:
             image = image.crop(box)
-        if image.height > 48:
-            ratio = 48 / image.height
-            image = image.resize((max(1, int(image.width * ratio)), 48), Image.Resampling.LANCZOS)
-        if image.width > 640:
-            ratio = 640 / image.width
-            image = image.resize((640, max(1, int(image.height * ratio))), Image.Resampling.LANCZOS)
+        if MATH_DISPLAY_SCALE != 1 and image.width and image.height:
+            new_w = max(1, round(image.width * MATH_DISPLAY_SCALE))
+            new_h = max(1, round(image.height * MATH_DISPLAY_SCALE))
+            image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        if image.height > 24:
+            ratio = 24 / image.height
+            image = image.resize((max(1, int(image.width * ratio)), 24), Image.Resampling.LANCZOS)
+        if image.width > 500:
+            ratio = 500 / image.width
+            image = image.resize((500, max(1, int(image.height * ratio))), Image.Resampling.LANCZOS)
     except Exception:
         image = None
     MATH_CACHE[key] = image
@@ -449,8 +457,12 @@ def render_card(question_text, options, figure_path, dest):
     if figure_path and os.path.exists(figure_path):
         with Image.open(figure_path) as fig:
             figure = fig.convert("RGBA")
-            figure.thumbnail((220, 200))
-    text_width = 860 if figure is None else 620
+            figure.thumbnail(FIG_MAX)
+    if figure is None:
+        text_width = 860
+    else:
+        left = MARGIN + 6
+        text_width = max(280, CARD_W - figure.width - FIG_RIGHT - FIG_GAP - left)
     question_lines = layout_rich(draw, question_text, font, text_width, Q_MATH)
     option_blocks = []
     for letter in ("A", "B", "C", "D", "E"):
@@ -465,7 +477,7 @@ def render_card(question_text, options, figure_path, dest):
             content_w = max(content_w, 36 + line_span(line, A_FONT)[1])
     width = int(content_w + MARGIN * 2 + 24)
     if figure is not None:
-        width += figure.width + 12
+        width += figure.width + FIG_GAP
     width = max(420, min(CARD_W, width))
     height = MARGIN + block_height(question_lines, Q_FONT) + 8
     for _letter, lines in option_blocks:
@@ -483,7 +495,7 @@ def render_card(question_text, options, figure_path, dest):
         y = draw_rich(card, draw, lines, small, INK, MARGIN + 36, y, A_FONT)
         y += 2
     if figure is not None:
-        card.paste(figure, (width - figure.width - 10, 12), figure)
+        card.paste(figure, (width - figure.width - FIG_RIGHT, 12), figure)
     if card.height > MAX_H or card.width > CARD_W:
         card.thumbnail((CARD_W, MAX_H), Image.Resampling.LANCZOS)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
